@@ -1,17 +1,22 @@
 import os
 import sys
 import json
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from datetime import datetime
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 PORT = 8421
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BRAIN_FILE = os.path.join(BASE_DIR, "ai_brain.json")
 
 class BrainSyncHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def _send_cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Connection", "close")
+        self.close_connection = True
 
     def do_OPTIONS(self):
         self.send_response(200)
@@ -69,7 +74,13 @@ class BrainSyncHandler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(b'{"success": true, "saved": true}')
-                print(f"[AI Sync Bridge] Da luu tu dong vao file: {BRAIN_FILE}")
+
+                now_str = datetime.now().strftime("%H:%M:%S")
+                markov_cnt = len(parsed.get("markovCounts", {}))
+                streak_cnt = len(parsed.get("streakStats", {}))
+                rounds = parsed.get("stats", {}).get("totalRoundsObserved", 0)
+                acc = parsed.get("stats", {}).get("accuracy", 0) * 100
+                print(f"[{now_str}] -> [AUTO-SAVE] Da luu tu dong vao ai_brain.json ({rounds} van | {markov_cnt + streak_cnt} mau cau | Do chinh xac: {acc:.1f}%)")
                 sys.stdout.flush()
                 return
             except Exception as e:
@@ -86,9 +97,11 @@ class BrainSyncHandler(BaseHTTPRequestHandler):
         return
 
 if __name__ == "__main__":
-    server = HTTPServer(("127.0.0.1", PORT), BrainSyncHandler)
+    server = ThreadingHTTPServer(("127.0.0.1", PORT), BrainSyncHandler)
+    server.daemon_threads = True
     print(f"=== WM Baccarat AI Sync Bridge dang chay tai http://127.0.0.1:{PORT} ===")
     print(f"Luu tu dong vao file: {BRAIN_FILE}")
+    print("San sang nhan du lieu tu Extension (Moi khi co van moi se tu dong luu)...")
     sys.stdout.flush()
     try:
         server.serve_forever()
