@@ -59,8 +59,8 @@ async function runTests() {
   // --------------------------------------------------------------------------
   console.log('--- TEST 2: DỰ ĐOÁN TRƯỚC VÁN, CHẤM ĐIỂM NGOÀI MẪU & SO VỚI BASELINE ---');
   const targetPattern = ['P', 'P', 'P', 'P'];
-  // Huấn luyện mẫu cầu bẻ bệt P -> B (cả Markov và Streak đều đồng thuận B)
-  for (let i = 0; i < 25; i++) {
+  // Huấn luyện mẫu cầu bẻ bệt P -> B (cả Markov và Streak đều đồng thuận B vượt ngưỡng an toàn 58%)
+  for (let i = 0; i < 100; i++) {
     engine.onRoundCompleted(`train_tbl_${i}_${Date.now()}_${Math.random()}`, 'Baccarat 1', targetPattern, 'B');
   }
 

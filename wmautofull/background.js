@@ -3,6 +3,30 @@
 
 console.log('[WM Background] Service worker đã khởi chạy');
 
+let cachedBridgeToken = null;
+
+async function getBridgeToken() {
+  if (cachedBridgeToken) return cachedBridgeToken;
+  try {
+    const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 1000) : null;
+    const resp = await fetch('http://127.0.0.1:8421/token', {
+      method: 'GET',
+      cache: 'no-cache',
+      signal: controller ? controller.signal : undefined
+    });
+    if (timeoutId) clearTimeout(timeoutId);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && data.token) {
+        cachedBridgeToken = data.token;
+        return cachedBridgeToken;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'reloadTab') {
     if (sender.tab && sender.tab.id) {
@@ -142,7 +166,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // Background không cần token để đọc (GET), nhưng cần token để ghi (POST)
         // Token được lưu ở bridge_token.txt, background không có quyền đọc file hệ thống
         // → dùng header Authorization nếu token được cung cấp qua payload
-        const bridgeToken = payload._bridgeToken || '';
+        let bridgeToken = payload._bridgeToken || cachedBridgeToken;
+        if (!bridgeToken) {
+          bridgeToken = await getBridgeToken();
+        }
         const headers = { 'Content-Type': 'application/json' };
         if (bridgeToken) {
           headers['Authorization'] = 'Bearer ' + bridgeToken;

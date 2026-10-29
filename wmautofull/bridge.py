@@ -108,6 +108,15 @@ class BrainSyncHandler(BaseHTTPRequestHandler):
             self._send_json_bytes(200, b'{"status": "running", "port": 8421}')
             return
 
+        elif self.path == "/token":
+            origin = self.headers.get("Origin", "")
+            if _is_allowed_origin(origin) or not origin:
+                self._send_json_bytes(200, json.dumps({"token": BRIDGE_TOKEN}).encode("utf-8"))
+                return
+            else:
+                self._send_json_bytes(403, b'{"error": "Forbidden origin"}')
+                return
+
         self.send_response(404)
         self.send_header("Content-Length", "0")
         self.end_headers()
