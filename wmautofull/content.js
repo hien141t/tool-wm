@@ -947,9 +947,25 @@ class WMAutoHelper {
       } catch (e) {}
     });
 
+    // Dọn dẹp bất kỳ bàn phantom nào còn sót trong tablesMap (ví dụ số bàn ghép lỗi > 25)
+    for (const [key, t] of this.tablesMap.entries()) {
+      const m = key.match(/_bac_(\d+)/i) || key.match(/bac_?(\d+)/i);
+      if (m && parseInt(m[1]) > 25) {
+        this.tablesMap.delete(key);
+      }
+    }
+
+    const isValidTableItem = (item) => {
+      if (!item || !item.id) return false;
+      const m = item.id.match(/_bac_(\d+)/i) || item.id.match(/bac_?(\d+)/i);
+      if (m && parseInt(m[1]) > 25) return false;
+      return true;
+    };
+
     // 3. Cập nhật vào tablesMap
     if (allFound.length > 0) {
       allFound.forEach(t => {
+        if (!isValidTableItem(t)) return;
         const existing = this.tablesMap.get(t.id);
         if (existing) {
           const oldHist = existing.history || [];
@@ -1028,6 +1044,17 @@ class WMAutoHelper {
     }
 
     if (id) {
+      const sexyMatch = id.match(/_sexy_bac_(\d+)/i);
+      if (sexyMatch) {
+        let num = parseInt(sexyMatch[1]);
+        if (num > 25 && num % 10 !== 0) num = Math.floor(num / 10);
+        return `(Sexy)Bac ${num}`;
+      }
+      const classicMatch = id.match(/_classic_bac_(\d+)/i);
+      if (classicMatch) return `(Classic)Bac ${classicMatch[1]}`;
+      const speedMatch = id.match(/_speed_bac_(\d+)/i);
+      if (speedMatch) return `(Speed)Bac ${speedMatch[1]}`;
+
       const idMatch = id.match(/groupMultiple_(\d+)_(\d+)/i) || id.match(/_(\d{3,4})$/);
       if (idMatch) {
         const tableNum = parseInt(idMatch[2] || idMatch[1]);
@@ -1154,38 +1181,57 @@ class WMAutoHelper {
   // Quét bên trong 1 Document cụ thể
   findTablesInDocument(doc) {
     const results = [];
+    if (!doc || !doc.body) return results;
+
+    // 1. Tuyệt đối loại trừ các phần tử thuộc Overlay và Mini-Pill của Bot
+    const isBotElement = (el) => {
+      if (!el || !el.closest) return false;
+      return !!(el.closest('#wm-auto-helper-overlay') || el.closest('#wm-auto-mini-pill') || el.closest('.wm-table-card'));
+    };
 
     // PHƯƠNG ÁN 1 (ƯU TIÊN): Nhận diện bàn Baccarat giao diện H5/Mobile
-    const titleRegex = /(?:\([^)]+\))?\s*Bac\s*\d+/i;
-    const allNodes = doc.querySelectorAll('*');
+    // Chỉ kiểm tra leaf nodes (không có thẻ con) để tránh bị dính số đếm ngược thời gian (như Bàn 3 ghép với 7s thành Bàn 37)
+    const titleRegex = /^(?:\(([^)]+)\)\s*)?(?:Bac(?:carat)?|Bàn)\s*0*([1-9]\d?)$/i;
+    const allCandidateNodes = doc.querySelectorAll('span, div, b, p, h1, h2, h3, h4, [class*="title"], [class*="name"], [class*="room"]');
 
-    for (const el of allNodes) {
-      if (el.children.length <= 2) {
-        const txt = (el.innerText || el.textContent || '').trim();
-        if (txt && titleRegex.test(txt) && txt.length <= 25) {
-          let card = el;
-          let foundCard = null;
+    for (const el of allCandidateNodes) {
+      if (isBotElement(el)) continue;
+      // Chỉ xét leaf node không có thẻ con
+      if (el.children && el.children.length > 0) continue;
 
-          for (let step = 0; step < 8; step++) {
-            if (!card || card === doc.body) break;
-            card = card.parentElement;
-            if (!card) break;
+      const txt = (el.innerText || el.textContent || '').trim();
+      const m = txt.match(titleRegex);
+      if (m) {
+        const groupName = m[1] ? `(${m[1]})` : '';
+        let tableNum = parseInt(m[2]);
+        if (tableNum > 25 && tableNum % 10 !== 0) {
+          const candidate = Math.floor(tableNum / 10);
+          if (candidate >= 1 && candidate <= 20) tableNum = candidate;
+        }
+        const cleanTitle = groupName ? `${groupName}Bac ${tableNum}` : `Bac ${tableNum}`;
 
-            const cardText = card.innerText || card.textContent || '';
-            if (/Player/i.test(cardText) && /Banker/i.test(cardText)) {
-              const matchTitles = cardText.match(/(?:\([^)]+\))?\s*Bac\s*\d+/gi) || [];
-              if (matchTitles.length === 1) {
-                foundCard = card;
-              } else if (matchTitles.length > 1) {
-                break;
-              }
+        let card = el;
+        let foundCard = null;
+
+        for (let step = 0; step < 8; step++) {
+          if (!card || card === doc.body || isBotElement(card)) break;
+          card = card.parentElement;
+          if (!card || isBotElement(card)) break;
+
+          const cardText = card.innerText || card.textContent || '';
+          if (/Player/i.test(cardText) && /Banker/i.test(cardText)) {
+            const matchTitles = cardText.match(/(?:\([^)]+\))?\s*Bac\s*\d+/gi) || [];
+            if (matchTitles.length === 1) {
+              foundCard = card;
+            } else if (matchTitles.length > 1) {
+              break;
             }
           }
+        }
 
-          if (foundCard && !results.some(r => r.cardNode === foundCard)) {
-            const tableData = this.extractH5TableData(foundCard, txt);
-            if (tableData) results.push(tableData);
-          }
+        if (foundCard && !isBotElement(foundCard) && !results.some(r => r.cardNode === foundCard)) {
+          const tableData = this.extractH5TableData(foundCard, cleanTitle);
+          if (tableData) results.push(tableData);
         }
       }
     }
@@ -1193,8 +1239,9 @@ class WMAutoHelper {
     // PHƯƠNG ÁN 2 (FALLBACK): Bàn giao diện PC (#pc_multi_bet_tablebox)
     if (results.length === 0) {
       const pcBoxes = doc.querySelectorAll('#pc_multi_bet_tablebox .gameroom-box.multiSelectContentItem, [class*="gameroom-box"]');
-      pcBoxes.forEach(box => {
-        const id = box.id || ('table_' + Math.random().toString(36).substr(2, 6));
+      pcBoxes.forEach((box, idx) => {
+        if (isBotElement(box)) return;
+        const id = box.id || ('box_pc_' + idx);
         let betTime = Number(box.getAttribute('data-bettime')) || 0;
         if (!betTime) {
           try {
@@ -1234,7 +1281,11 @@ class WMAutoHelper {
 
   // Trích xuất chi tiết bàn từ thẻ H5
   extractH5TableData(cardNode, rawTitle) {
-    const cleanId = rawTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    if (!cardNode) return null;
+    let cleanId = cardNode.id;
+    if (!cleanId || cleanId.startsWith('elem_') || cleanId.startsWith('box_')) {
+      cleanId = rawTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    }
 
     // 1. Tìm nút cược Player & Banker
     let playerBtn = null;
@@ -1552,9 +1603,23 @@ class WMAutoHelper {
 
   // Cuộn nạp toàn bộ danh sách bàn (kích hoạt lazy loading)
   forceScrollAllTables() {
-    this.addLog('Đang kích hoạt cuộn nạp toàn bộ danh sách bàn...', 'info');
+    this.addLog('🔄 Đang kích hoạt cuộn nạp và làm mới toàn bộ danh sách bàn...', 'info');
 
-    // Tìm các thẻ có thanh cuộn
+    // Xóa sạch bộ nhớ bàn cũ để dọn dẹp triệt để bàn ảo
+    this.tablesMap.clear();
+
+    // Bắn tín hiệu FORCE_SCROLL_TABLES tới tất cả iframe để dọn sạch cachedTablesMap
+    const iframes = document.querySelectorAll('iframe');
+    iframes.forEach(iframe => {
+      try {
+        iframe.contentWindow?.postMessage({
+          action: 'FORCE_SCROLL_TABLES',
+          messageId: ++this.messageIdCounter
+        }, '*');
+      } catch (e) {}
+    });
+
+    // Tìm các thẻ có thanh cuộn trên Document chính
     const allDivs = Array.from(document.querySelectorAll('*'));
     const scrollers = allDivs.filter(el => {
       try {
@@ -2416,6 +2481,8 @@ class WMAutoHelper {
       if (data.type === 'WM_IFRAME_RESPONSE' && Array.isArray(data.tables)) {
         data.tables.forEach(t => {
           if (!t || !t.id) return;
+          const m = t.id.match(/_bac_(\d+)/i) || t.id.match(/bac_?(\d+)/i);
+          if (m && parseInt(m[1]) > 25) return;
           const existing = this.tablesMap.get(t.id);
           if (existing) {
             const oldHist = existing.history || [];

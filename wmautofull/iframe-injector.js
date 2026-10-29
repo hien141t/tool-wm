@@ -231,6 +231,7 @@
 
   function forceScrollAllTables(messageId) {
     try {
+      cachedTablesMap.clear();
       const doc = getTargetDoc();
       const scrollers = Array.from(doc.querySelectorAll('*')).filter(el => {
         try {
@@ -292,6 +293,17 @@
     }
 
     if (id) {
+      const sexyMatch = id.match(/_sexy_bac_(\d+)/i);
+      if (sexyMatch) {
+        let num = parseInt(sexyMatch[1]);
+        if (num > 25 && num % 10 !== 0) num = Math.floor(num / 10);
+        return `(Sexy)Bac ${num}`;
+      }
+      const classicMatch = id.match(/_classic_bac_(\d+)/i);
+      if (classicMatch) return `(Classic)Bac ${classicMatch[1]}`;
+      const speedMatch = id.match(/_speed_bac_(\d+)/i);
+      if (speedMatch) return `(Speed)Bac ${speedMatch[1]}`;
+
       const idMatch = id.match(/groupMultiple_(\d+)_(\d+)/i) || id.match(/_(\d{3,4})$/);
       if (idMatch) {
         const tableNum = parseInt(idMatch[2] || idMatch[1]);
@@ -418,72 +430,106 @@
   function getTables(messageId) {
     try {
       const doc = getTargetDoc();
-      const titleRegex = /(?:\([^)]+\))?\s*Bac\s*\d+/i;
-      const allNodes = doc.querySelectorAll('*');
+      if (!doc || !doc.body) return;
 
-      for (const el of allNodes) {
-        if (el.children.length <= 2) {
-          const txt = (el.innerText || el.textContent || '').trim();
-          if (txt && titleRegex.test(txt) && txt.length <= 25) {
-            let card = el;
-            let foundCard = null;
+      // 1. Tuyệt đối loại trừ các phần tử thuộc Overlay và Mini-Pill của Bot nếu có
+      const isBotElement = (el) => {
+        if (!el || !el.closest) return false;
+        return !!(el.closest('#wm-auto-helper-overlay') || el.closest('#wm-auto-mini-pill') || el.closest('.wm-table-card'));
+      };
 
-            for (let step = 0; step < 8; step++) {
-              if (!card || card === doc.body) break;
-              card = card.parentElement;
-              if (!card) break;
+      // Dọn dẹp bất kỳ bàn phantom nào còn sót trong cachedTablesMap
+      for (const [key, t] of cachedTablesMap.entries()) {
+        const m = key.match(/_bac_(\d+)/i) || key.match(/bac_?(\d+)/i);
+        if (m && parseInt(m[1]) > 25) {
+          cachedTablesMap.delete(key);
+        }
+      }
 
-              const cardText = card.innerText || card.textContent || '';
-              if (/Player/i.test(cardText) && /Banker/i.test(cardText)) {
-                const matchTitles = cardText.match(/(?:\([^)]+\))?\s*Bac\s*\d+/gi) || [];
-                if (matchTitles.length === 1) {
-                  foundCard = card;
-                } else if (matchTitles.length > 1) {
-                  break;
-                }
+      const currentScanFoundIds = new Set();
+
+      // PHƯƠNG ÁN 1 (ƯU TIÊN): Nhận diện bàn Baccarat giao diện H5/Mobile
+      // Chỉ kiểm tra leaf nodes (el.children.length === 0) khớp chính xác regex
+      const titleRegex = /^(?:\(([^)]+)\)\s*)?(?:Bac(?:carat)?|Bàn)\s*0*([1-9]\d?)$/i;
+      const allCandidateNodes = doc.querySelectorAll('span, div, b, p, h1, h2, h3, h4, [class*="title"], [class*="name"], [class*="room"]');
+
+      for (const el of allCandidateNodes) {
+        if (isBotElement(el)) continue;
+        // Chỉ xét leaf node không có thẻ con để triệt tiêu việc ghép dính số đếm ngược
+        if (el.children && el.children.length > 0) continue;
+
+        const txt = (el.innerText || el.textContent || '').trim();
+        const m = txt.match(titleRegex);
+        if (m) {
+          const groupName = m[1] ? `(${m[1]})` : '';
+          let tableNum = parseInt(m[2]);
+          if (tableNum > 25 && tableNum % 10 !== 0) {
+            const candidate = Math.floor(tableNum / 10);
+            if (candidate >= 1 && candidate <= 20) tableNum = candidate;
+          }
+          if (tableNum > 25) continue;
+
+          const cleanTitle = groupName ? `${groupName}Bac ${tableNum}` : `Bac ${tableNum}`;
+          const cleanId = cleanTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+
+          let card = el;
+          let foundCard = null;
+
+          for (let step = 0; step < 8; step++) {
+            if (!card || card === doc.body || isBotElement(card)) break;
+            card = card.parentElement;
+            if (!card || isBotElement(card)) break;
+
+            const cardText = card.innerText || card.textContent || '';
+            if (/Player/i.test(cardText) && /Banker/i.test(cardText)) {
+              const matchTitles = cardText.match(/(?:\([^)]+\))?\s*Bac\s*\d+/gi) || [];
+              if (matchTitles.length === 1) {
+                foundCard = card;
+              } else if (matchTitles.length > 1) {
+                break;
               }
             }
+          }
 
-            if (foundCard) {
-              const cleanId = txt.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-              const history = extractRoadHistory(foundCard);
+          if (foundCard && !isBotElement(foundCard)) {
+            const history = extractRoadHistory(foundCard);
 
-              let betTime = 0;
-              const timeEl = foundCard.querySelector('.time, .bet-time, .count-down, [class*="time"], [class*="countdown"], [class*="second"]');
-              if (timeEl) {
-                const m = (timeEl.innerText || timeEl.textContent || '').match(/(\d{1,2})\s*s?/i);
-                if (m) betTime = parseInt(m[1]);
-              }
-              if (!betTime) {
-                const timeMatch = (foundCard.innerText || '').match(/\b(\d{1,2})\s*s\b/i);
-                if (timeMatch) betTime = parseInt(timeMatch[1]);
-              }
-              if (!betTime) {
-                const dataTime = foundCard.getAttribute('data-bettime') || foundCard.getAttribute('data-time');
-                if (dataTime) betTime = parseInt(dataTime);
-              }
-
-              // Nếu đang đóng cược / chia bài thì betTime = 0
-              if (/(ngừng cược|no more bet|đang chia|chờ ván mới|dealing|settle)/i.test(foundCard.innerText || '')) {
-                betTime = 0;
-              }
-
-              cachedTablesMap.set(cleanId, {
-                id: cleanId,
-                name: txt,
-                betTime: betTime,
-                history: history
-              });
+            let betTime = 0;
+            const timeEl = foundCard.querySelector('.time, .bet-time, .count-down, [class*="time"], [class*="countdown"], [class*="second"]');
+            if (timeEl) {
+              const tm = (timeEl.innerText || timeEl.textContent || '').match(/(\d{1,2})\s*s?/i);
+              if (tm) betTime = parseInt(tm[1]);
             }
+            if (!betTime) {
+              const timeMatch = (foundCard.innerText || '').match(/\b(\d{1,2})\s*s\b/i);
+              if (timeMatch) betTime = parseInt(timeMatch[1]);
+            }
+            if (!betTime) {
+              const dataTime = foundCard.getAttribute('data-bettime') || foundCard.getAttribute('data-time');
+              if (dataTime) betTime = parseInt(dataTime);
+            }
+
+            // Nếu đang đóng cược / chia bài thì betTime = 0
+            if (/(ngừng cược|no more bet|đang chia|chờ ván mới|dealing|settle)/i.test(foundCard.innerText || '')) {
+              betTime = 0;
+            }
+
+            currentScanFoundIds.add(cleanId);
+            cachedTablesMap.set(cleanId, {
+              id: cleanId,
+              name: cleanTitle,
+              betTime: betTime,
+              history: history
+            });
           }
         }
       }
 
       // Fallback cho PC (#pc_multi_bet_tablebox)
       const pcBoxes = doc.querySelectorAll('#pc_multi_bet_tablebox .gameroom-box.multiSelectContentItem, [class*="gameroom-box"]');
-      pcBoxes.forEach(box => {
-        const id = box.id;
-        if (!id) return;
+      pcBoxes.forEach((box, idx) => {
+        if (isBotElement(box)) return;
+        const id = box.id || ('box_pc_' + idx);
         let betTime = Number(box.getAttribute('data-bettime')) || 0;
         if (!betTime) {
           try {
@@ -502,6 +548,7 @@
         const friendlyName = extractTableName(box, id);
         const history = extractRoadHistory(box);
 
+        currentScanFoundIds.add(id);
         cachedTablesMap.set(id, {
           id: id,
           name: friendlyName,
@@ -509,6 +556,15 @@
           history: history
         });
       });
+
+      // Nếu có bàn quét được thực tế, dọn các bàn rỗng không có history khỏi cachedTablesMap
+      if (currentScanFoundIds.size > 0) {
+        for (const [key, t] of cachedTablesMap.entries()) {
+          if (!currentScanFoundIds.has(key) && (!t.history || t.history.length === 0)) {
+            cachedTablesMap.delete(key);
+          }
+        }
+      }
 
       const tables = Array.from(cachedTablesMap.values());
       window.parent.postMessage({
