@@ -67,6 +67,27 @@ class WMAutoHelper {
       // Khởi chạy quét bàn nền ngay lập tức (kể cả khi chưa bấm Bắt đầu)
       this.startBackgroundScanner();
 
+      // Khôi phục nhật ký dự đoán AI từ IndexedDB khi mở lại extension
+      if (this.aiEngine && this.aiEngine.db) {
+        this.aiEngine.db.getRecentPredictions(15).then(list => {
+          if (list && list.length > 0 && this.recentPredictionsLog.length === 0) {
+            this.recentPredictionsLog = list.map(p => ({
+              id: p.id,
+              tableId: p.tableId,
+              tableName: p.tableName,
+              predicted: p.predicted,
+              prob: Math.round(((p.predicted === 'B' ? p.probB : p.probP) || 0.5) * 100),
+              reason: p.rationale || 'Đánh giá đa mô hình',
+              mode: p.tradingMode || 'PAPER',
+              time: new Date(p.timestamp || Date.now()).toLocaleTimeString('vi-VN'),
+              actualOutcome: p.actualOutcome,
+              status: p.status
+            }));
+            this.updateAILogTable();
+          }
+        });
+      }
+
     } catch (err) {
       console.error('[WM Bot] Lỗi khởi động:', err);
       this.init();
@@ -869,21 +890,25 @@ class WMAutoHelper {
           const oldHist = existing.history || [];
           const newHist = t.history || [];
           if (newHist.length > oldHist.length) {
-            const newOutcome = newHist[newHist.length - 1];
-            if (this.aiEngine) {
-              this.aiEngine.onRoundCompleted(t.id, t.name || existing.name || t.id, oldHist, newOutcome);
-              const recentLog = this.recentPredictionsLog.find(p => p.tableId === t.id && p.status === 'PENDING');
-              if (recentLog) {
-                recentLog.actualOutcome = newOutcome;
-                if (newOutcome === 'T') {
-                  recentLog.status = 'TIE_PUSH';
-                } else if (recentLog.predicted === newOutcome) {
-                  recentLog.status = 'WIN';
-                } else {
-                  recentLog.status = 'LOSS';
-                }
-                this.updateAILogTable();
+            for (let i = oldHist.length; i < newHist.length; i++) {
+              const prev = newHist.slice(0, i);
+              const outcome = newHist[i];
+              if (this.aiEngine) {
+                this.aiEngine.onRoundCompleted(t.id, t.name || existing.name || t.id, prev, outcome);
               }
+            }
+            const recentLog = this.recentPredictionsLog.find(p => p.tableId === t.id && p.status === 'PENDING');
+            if (recentLog) {
+              const newOutcome = newHist[newHist.length - 1];
+              recentLog.actualOutcome = newOutcome;
+              if (newOutcome === 'T') {
+                recentLog.status = 'TIE_PUSH';
+              } else if (recentLog.predicted === newOutcome) {
+                recentLog.status = 'WIN';
+              } else {
+                recentLog.status = 'LOSS';
+              }
+              this.updateAILogTable();
             }
           }
           existing.name = t.name || existing.name;
@@ -2085,7 +2110,9 @@ class WMAutoHelper {
     const accEl = document.getElementById('wm-ai-accuracy');
     if (accEl) {
       const pct = ((stats.accuracy || 0) * 100).toFixed(1);
-      accEl.textContent = `${pct}%`;
+      const edge = ((stats.edgeOverBaseline !== undefined ? stats.edgeOverBaseline : (stats.accuracy ? stats.accuracy - 0.5 : 0)) * 100).toFixed(1);
+      const edgeSign = Number(edge) >= 0 ? `+${edge}%` : `${edge}%`;
+      accEl.innerHTML = `${pct}% <span style="font-size:9.5px; font-weight:normal; color:#94a3b8; display:block;">(Edge: <b style="color:${Number(edge) >= 0 ? '#10b981' : '#ef4444'}">${edgeSign}</b> vs 50% Base)</span>`;
       accEl.style.color = (stats.accuracy >= 0.52) ? '#00ff88' : ((stats.accuracy >= 0.48) ? '#facc15' : '#ef4444');
     }
 
@@ -2207,21 +2234,25 @@ class WMAutoHelper {
             const oldHist = existing.history || [];
             const newHist = t.history || [];
             if (newHist.length > oldHist.length) {
-              const newOutcome = newHist[newHist.length - 1];
-              if (this.aiEngine) {
-                this.aiEngine.onRoundCompleted(t.id, t.name || existing.name || t.id, oldHist, newOutcome);
-                const recentLog = this.recentPredictionsLog.find(p => p.tableId === t.id && p.status === 'PENDING');
-                if (recentLog) {
-                  recentLog.actualOutcome = newOutcome;
-                  if (newOutcome === 'T') {
-                    recentLog.status = 'TIE_PUSH';
-                  } else if (recentLog.predicted === newOutcome) {
-                    recentLog.status = 'WIN';
-                  } else {
-                    recentLog.status = 'LOSS';
-                  }
-                  this.updateAILogTable();
+              for (let i = oldHist.length; i < newHist.length; i++) {
+                const prev = newHist.slice(0, i);
+                const outcome = newHist[i];
+                if (this.aiEngine) {
+                  this.aiEngine.onRoundCompleted(t.id, t.name || existing.name || t.id, prev, outcome);
                 }
+              }
+              const recentLog = this.recentPredictionsLog.find(p => p.tableId === t.id && p.status === 'PENDING');
+              if (recentLog) {
+                const newOutcome = newHist[newHist.length - 1];
+                recentLog.actualOutcome = newOutcome;
+                if (newOutcome === 'T') {
+                  recentLog.status = 'TIE_PUSH';
+                } else if (recentLog.predicted === newOutcome) {
+                  recentLog.status = 'WIN';
+                } else {
+                  recentLog.status = 'LOSS';
+                }
+                this.updateAILogTable();
               }
             }
             existing.name = t.name || existing.name;

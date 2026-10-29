@@ -171,22 +171,25 @@
         if (bp.length >= n) {
           const ctx = bp.slice(-n).join('');
           const stats = this.ngramCounts[ctx];
-          if (stats && stats.total >= this.minSupport) {
-            const probB = (stats.B + this.alpha) / (stats.total + 2 * this.alpha);
-            const probP = 1 - probB;
-            const diff = Math.abs(probB - 0.5);
+          if (stats) {
+            const total = stats.total || ((stats.B || 0) + (stats.P || 0));
+            if (total >= this.minSupport) {
+              const probB = ((stats.B || 0) + this.alpha) / (total + 2 * this.alpha);
+              const probP = 1 - probB;
+              const diff = Math.abs(probB - 0.5);
 
-            return {
-              model: this.name,
-              order: n,
-              context: ctx,
-              support: stats.total,
-              probB: probB,
-              probP: probP,
-              predicted: probB > 0.55 ? 'B' : (probP > 0.55 ? 'P' : 'PASS'),
-              confidence: diff * 2,
-              rationale: `Chuỗi [${ctx}] đã gặp ${stats.total} lần trong quá khứ (${stats.B} lần Banker, ${stats.P} lần Player)`
-            };
+              return {
+                model: this.name,
+                order: n,
+                context: ctx,
+                support: total,
+                probB: probB,
+                probP: probP,
+                predicted: probB > 0.55 ? 'B' : (probP > 0.55 ? 'P' : 'PASS'),
+                confidence: diff * 2,
+                rationale: `Chuỗi [${ctx}] đã gặp ${total} lần trong quá khứ (${stats.B || 0} lần Banker, ${stats.P || 0} lần Player)`
+              };
+            }
           }
         }
       }
@@ -241,27 +244,31 @@
       }
 
       const key = `${current}_${streakLen}`;
-      const stats = this.streakStats[key];
-      if (stats && (stats.continue + stats.break >= 3)) {
-        const total = stats.continue + stats.break;
-        const probContinue = (stats.continue + 0.5) / (total + 1);
-        const probBreak = 1 - probContinue;
+      const stats = this.streakStats[key] || this.streakStats[`streak_${current}_${streakLen}`];
+      if (stats) {
+        const cont = stats.continue !== undefined ? stats.continue : (stats.continueCount || 0);
+        const brk = stats.break !== undefined ? stats.break : (stats.breakCount || 0);
+        const total = cont + brk;
+        if (total >= 3) {
+          const probContinue = (cont + 0.5) / (total + 1);
+          const probBreak = 1 - probContinue;
 
-        const predicted = probContinue > 0.55 ? current : (probBreak > 0.55 ? (current === 'B' ? 'P' : 'B') : 'PASS');
-        const probB = current === 'B' ? probContinue : probBreak;
-        const probP = current === 'P' ? probContinue : probBreak;
+          const predicted = probContinue > 0.55 ? current : (probBreak > 0.55 ? (current === 'B' ? 'P' : 'B') : 'PASS');
+          const probB = current === 'B' ? probContinue : probBreak;
+          const probP = current === 'P' ? probContinue : probBreak;
 
-        return {
-          model: this.name,
-          streakLength: streakLen,
-          currentSide: current,
-          support: total,
-          probB: probB,
-          probP: probP,
-          predicted: predicted,
-          confidence: Math.abs(probContinue - 0.5) * 2,
-          rationale: `Bệt [${current}] dài ${streakLen} ván: lịch sử ${stats.continue}/${total} lần đi tiếp, ${stats.break}/${total} lần bẻ`
-        };
+          return {
+            model: this.name,
+            streakLength: streakLen,
+            currentSide: current,
+            support: total,
+            probB: probB,
+            probP: probP,
+            predicted: predicted,
+            confidence: Math.abs(probContinue - 0.5) * 2,
+            rationale: `Bệt [${current}] dài ${streakLen} ván: lịch sử ${cont}/${total} lần đi tiếp, ${brk}/${total} lần bẻ`
+          };
+        }
       }
       return null;
     }
@@ -439,8 +446,13 @@
         losses: 0,
         tiesPush: 0,
         accuracy: 0,
+        baselineAccuracy: 0.50, // Mức cơ sở ngẫu nhiên (Baseline 50.0%)
+        edgeOverBaseline: 0,    // Độ vượt trội so với mức cơ sở (Alpha/Edge)
         patternsLearnedCount: 0
       };
+
+      // Bộ lọc chống học trùng ván đa luồng (Round Deduplication Cache)
+      this.processedRounds = new Set();
 
       // Chế độ cược an toàn: 'PAPER' (Mặc định - chỉ mô phỏng & học) hoặc 'REAL' (cược tiền thật)
       this.tradingMode = localStorage.getItem('wm_ai_trading_mode') || 'PAPER';
@@ -450,7 +462,7 @@
       // Trạng thái kết nối Local Sync Bridge (tự động lưu vào file ai_brain.json)
       this.bridgeConnected = false;
 
-      this.loadSavedState();
+      this.isReadyPromise = this.loadSavedState();
     }
 
     async loadSavedState() {
@@ -481,6 +493,7 @@
           if (savedKnowledge.weights) this.ensemble.weights = savedKnowledge.weights;
           if (savedKnowledge.markovCounts) this.markov.ngramCounts = savedKnowledge.markovCounts;
           if (savedKnowledge.streakStats) this.streak.streakStats = savedKnowledge.streakStats;
+          if (savedKnowledge.tableShoeStats) this.tableLearner.tableShoeStats = savedKnowledge.tableShoeStats;
         } else {
           // 3. Nếu IndexedDB trống (Profile mới), đọc file ai_brain.json đóng gói sẵn trong extension!
           try {
@@ -511,23 +524,22 @@
 
     loadPretrainedBaseline() {
       this.markov.ngramCounts = {
-        'B': { B: 18, P: 17, T: 4 },
-        'P': { B: 17, P: 18, T: 4 },
-        'BB': { B: 12, P: 10, T: 2 },
-        'PP': { B: 10, P: 12, T: 2 },
-        'BP': { B: 11, P: 9, T: 2 },
-        'PB': { B: 9, P: 11, T: 2 },
-        'BBB': { B: 7, P: 8, T: 1 },
-        'PPP': { B: 8, P: 7, T: 1 },
-        'BPB': { B: 6, P: 9, T: 1 },
-        'PBP': { B: 9, P: 6, T: 1 }
+        'B': { B: 18, P: 17, T: 4, total: 35 },
+        'P': { B: 17, P: 18, T: 4, total: 35 },
+        'BB': { B: 15, P: 7, T: 2, total: 22 },
+        'PP': { B: 7, P: 15, T: 2, total: 22 },
+        'BP': { B: 15, P: 5, T: 2, total: 20 },
+        'PB': { B: 5, P: 15, T: 2, total: 20 },
+        'BBB': { B: 5, P: 13, T: 1, total: 18 },
+        'PPP': { B: 13, P: 5, T: 1, total: 18 },
+        'BPB': { B: 4, P: 12, T: 1, total: 16 },
+        'PBP': { B: 12, P: 4, T: 1, total: 16 }
       };
       this.streak.streakStats = {
-        'streak_B_2': { continueCount: 12, breakCount: 10 },
-        'streak_P_2': { continueCount: 12, breakCount: 10 },
-        'streak_B_3': { continueCount: 7, breakCount: 9 },
-        'streak_P_3': { continueCount: 7, breakCount: 9 },
-        'alt_3': { continueCount: 9, breakCount: 6 }
+        'B_2': { continue: 14, break: 6 },
+        'P_2': { continue: 14, break: 6 },
+        'B_3': { continue: 5, break: 14 },
+        'P_3': { continue: 5, break: 14 }
       };
     }
 
@@ -538,6 +550,7 @@
         weights: this.ensemble.weights,
         markovCounts: this.markov.ngramCounts,
         streakStats: this.streak.streakStats,
+        tableShoeStats: this.tableLearner.tableShoeStats,
         stats: {
           totalRoundsObserved: this.stats.totalRoundsObserved || 0,
           predictionsScored: this.stats.predictionsScored || 0,
@@ -545,6 +558,8 @@
           losses: this.stats.losses || 0,
           tiesPush: this.stats.tiesPush || 0,
           accuracy: this.stats.accuracy || 0,
+          baselineAccuracy: this.stats.baselineAccuracy || 0.50,
+          edgeOverBaseline: this.stats.edgeOverBaseline || 0,
           patternsLearnedCount: Object.keys(this.markov.ngramCounts).length + Object.keys(this.streak.streakStats).length
         }
       };
@@ -552,9 +567,11 @@
 
     async importKnowledge(data) {
       if (!data || typeof data !== 'object') return false;
+      if (this.isReadyPromise) await this.isReadyPromise;
       if (data.weights) this.ensemble.weights = Object.assign(this.ensemble.weights, data.weights);
       if (data.markovCounts) this.markov.ngramCounts = Object.assign(this.markov.ngramCounts, data.markovCounts);
       if (data.streakStats) this.streak.streakStats = Object.assign(this.streak.streakStats, data.streakStats);
+      if (data.tableShoeStats) this.tableLearner.tableShoeStats = Object.assign(this.tableLearner.tableShoeStats, data.tableShoeStats);
       if (data.stats) {
         this.stats = Object.assign(this.stats, data.stats);
       }
@@ -569,6 +586,7 @@
         weights: this.ensemble.weights,
         markovCounts: this.markov.ngramCounts,
         streakStats: this.streak.streakStats,
+        tableShoeStats: this.tableLearner.tableShoeStats,
         stats: this.stats,
         updatedAt: new Date().toISOString()
       };
@@ -614,9 +632,24 @@
      */
     onRoundCompleted(tableId, tableName, previousHistory, newOutcome) {
       if (!newOutcome) return;
+
+      // 1. CHỐNG HỌC TRÙNG (Round Deduplication Filter):
+      // Một ván chỉ được ghi nhận và học đúng 1 lần duy nhất, kể cả khi dữ liệu đến từ nhiều luồng (scanner, iframe, websocket)
+      const prevSig = (previousHistory && previousHistory.length > 0) ? previousHistory.slice(-6).join('') : 'init';
+      const roundKey = `${tableId}_#${previousHistory ? previousHistory.length : 0}_${prevSig}_${newOutcome}`;
+      if (this.processedRounds.has(roundKey)) {
+        return; // Đã xử lý ván này rồi -> bỏ qua ngay lập tức, tuyệt đối không học trùng
+      }
+      this.processedRounds.add(roundKey);
+      if (this.processedRounds.size > 2000) {
+        const oldest = Array.from(this.processedRounds).slice(0, 500);
+        oldest.forEach(k => this.processedRounds.delete(k));
+      }
+
       this.stats.totalRoundsObserved++;
 
-      // 1. Kiểm tra đối chiếu với Dự đoán đang chờ
+      // 2. KIỂM THỬ KHẢ NĂNG DỰ ĐOÁN NGOÀI MẪU (OUT-OF-SAMPLE EVALUATION):
+      // Đánh giá dự đoán đã lưu TRƯỚC KHI cho các mô hình học kết quả ván mới này
       const pending = this.pendingPredictions.get(tableId);
       if (pending && pending.status === 'PENDING') {
         this.pendingPredictions.delete(tableId);
@@ -638,9 +671,12 @@
           this.stats.predictionsScored++;
           const scoredCount = this.stats.wins + this.stats.losses;
           this.stats.accuracy = scoredCount > 0 ? (this.stats.wins / scoredCount) : 0;
+          // Tính hiệu quả vượt trội so với mức cơ sở ngẫu nhiên (Baseline 50.0%)
+          this.stats.baselineAccuracy = 0.50;
+          this.stats.edgeOverBaseline = this.stats.accuracy - this.stats.baselineAccuracy;
         }
 
-        // Cập nhật trọng số thích ứng cho từng mô hình con
+        // Cập nhật trọng số thích ứng cho từng mô hình con (Online Adaptive Weighting)
         if (newOutcome === 'B' || newOutcome === 'P') {
           if (pending.subPredictions) {
             for (const [key, sub] of Object.entries(pending.subPredictions)) {
@@ -658,14 +694,14 @@
         this.db.savePrediction(pending);
       }
 
-      // 2. Học trực tuyến ngay lập tức trên dữ liệu ván mới
+      // 3. HỌC TRỰC TUYẾN NGAY LẬP TỨC TRÊN DỮ LIỆU VÁN MỚI (SAU KHI ĐÃ ĐỐI CHIẾU NGOÀI MẪU)
       this.markov.trainRound(previousHistory, newOutcome);
       this.streak.trainRound(previousHistory, newOutcome);
       this.tableLearner.trainRound(tableId, newOutcome);
 
       // Lưu ván vào DB
       this.db.saveRound({
-        id: `${tableId}_${Date.now()}`,
+        id: `${tableId}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         tableId: tableId,
         tableName: tableName,
         outcome: newOutcome,
@@ -674,8 +710,8 @@
         sessionId: this.sessionId
       });
 
-      // Lưu định kỳ kiến thức học
-      if (this.stats.totalRoundsObserved % 5 === 0) {
+      // Tự động lưu kiến thức định kỳ
+      if (this.stats.totalRoundsObserved % 2 === 0) {
         this.persistKnowledge();
       }
 
