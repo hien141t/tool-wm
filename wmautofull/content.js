@@ -239,20 +239,10 @@ class WMAutoHelper {
                 <option value="5000">Chip 5,000</option>
               </select>
             </div>
-          </div>
-          <div style="font-size:10px; color:#94a3b8; margin-top:8px;">Chọn nhanh chip (tự động click trên bàn game):</div>
-          <div class="wm-quick-chips-row">
-            <button type="button" class="wm-quick-chip-btn" data-chip="10">🪙 10</button>
-            <button type="button" class="wm-quick-chip-btn" data-chip="20">🪙 20</button>
-            <button type="button" class="wm-quick-chip-btn" data-chip="50">🪙 50</button>
-            <button type="button" class="wm-quick-chip-btn" data-chip="100">🪙 100</button>
-            <button type="button" class="wm-quick-chip-btn" data-chip="500">🪙 500</button>
-            <button type="button" class="wm-quick-chip-btn" data-chip="1000">🪙 1K</button>
-            <button type="button" class="wm-quick-chip-btn" data-chip="5000">🪙 5K</button>
-          </div>
-          <div class="wm-form-group" style="margin-top:8px;">
-            <label class="wm-label">Số bàn tối đa theo dõi:</label>
-            <input type="number" class="wm-input" id="wm-max-tables" min="1" max="30" value="20">
+            <div class="wm-form-group">
+              <label class="wm-label">Số bàn tối đa theo dõi:</label>
+              <input type="number" class="wm-input" id="wm-max-tables" min="1" max="30" value="20">
+            </div>
           </div>
         </div>
 
@@ -403,25 +393,8 @@ class WMAutoHelper {
     chipSelect.addEventListener('change', (e) => {
       this.selectedChip = parseInt(e.target.value);
       this.saveSettings();
-      this.updateQuickChipButtonsUI();
       this.addLog(`Đã chọn Chip: ${this.selectedChip}`, 'info');
       this.selectGameChip(this.selectedChip);
-    });
-
-    // Nút chọn nhanh chip (tự động click trên bàn game)
-    this.overlay.querySelectorAll('.wm-quick-chip-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const chipVal = parseInt(btn.getAttribute('data-chip'));
-        if (chipVal) {
-          this.selectedChip = chipVal;
-          const sel = document.getElementById('wm-chip-select');
-          if (sel) sel.value = String(chipVal);
-          this.saveSettings();
-          this.updateQuickChipButtonsUI();
-          this.addLog(`Đã chọn Chip: ${this.selectedChip}`, 'info');
-          this.selectGameChip(this.selectedChip);
-        }
-      });
     });
 
     const maxTablesInput = document.getElementById('wm-max-tables');
@@ -503,7 +476,6 @@ class WMAutoHelper {
     try {
       const chipSelect = document.getElementById('wm-chip-select');
       if (chipSelect) chipSelect.value = String(this.selectedChip);
-      this.updateQuickChipButtonsUI();
 
       const maxTablesInput = document.getElementById('wm-max-tables');
       if (maxTablesInput) maxTablesInput.value = String(this.maxTables);
@@ -512,6 +484,7 @@ class WMAutoHelper {
       if (patternsInput && this.patterns.length > 0) {
         patternsInput.value = this.patterns.map(p => `${p.condition}=${p.bet}`).join('\n');
       }
+      this.setControlsLocked(this.isRunning);
     } catch (e) {}
   }
 
@@ -1364,6 +1337,25 @@ class WMAutoHelper {
     }, 1200);
   }
 
+  setControlsLocked(locked) {
+    if (!this.overlay) return;
+    const chipSelect = document.getElementById('wm-chip-select');
+    if (chipSelect) chipSelect.disabled = locked;
+
+    const maxTablesInput = document.getElementById('wm-max-tables');
+    if (maxTablesInput) maxTablesInput.disabled = locked;
+
+    const patternsInput = document.getElementById('wm-patterns-input');
+    if (patternsInput) patternsInput.disabled = locked;
+
+    const presetButtons = this.overlay.querySelectorAll('.wm-chip-pill-btn');
+    presetButtons.forEach(btn => {
+      btn.disabled = locked;
+      btn.style.pointerEvents = locked ? 'none' : 'auto';
+      btn.style.opacity = locked ? '0.45' : '1';
+    });
+  }
+
   // ==========================================================================
   // BẮT ĐẦU / DỪNG TỰ ĐỘNG CƯỢC
   // ==========================================================================
@@ -1375,6 +1367,7 @@ class WMAutoHelper {
     this.isRunning = true;
     document.getElementById('wm-start-btn').disabled = true;
     document.getElementById('wm-stop-btn').disabled = false;
+    this.setControlsLocked(true);
     this.updateStatus('ĐANG TỰ ĐỘNG CƯỢC', 'running');
     this.addLog(`=== BẮT ĐẦU AUTO BET (Đang quét ${this.tablesMap.size} bàn) ===`, 'success');
 
@@ -1390,6 +1383,7 @@ class WMAutoHelper {
     if (this.bettingLoopInterval) clearInterval(this.bettingLoopInterval);
     document.getElementById('wm-start-btn').disabled = false;
     document.getElementById('wm-stop-btn').disabled = true;
+    this.setControlsLocked(false);
     this.updateStatus('ĐÃ DỪNG', 'stopped');
     this.addLog('=== ĐÃ DỪNG TỰ ĐỘNG CƯỢC ===', 'error');
   }
@@ -1464,18 +1458,6 @@ class WMAutoHelper {
   // Chip 20: (//div[@name='20'])[1]
   // Chip 50: (//div[@name='50'])[1]
   // ==========================================================================
-  updateQuickChipButtonsUI() {
-    if (!this.overlay) return;
-    this.overlay.querySelectorAll('.wm-quick-chip-btn').forEach(btn => {
-      const chip = parseInt(btn.getAttribute('data-chip'));
-      if (chip === this.selectedChip) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
-      }
-    });
-  }
-
   selectGameChip(chipValue) {
     const chipStr = String(chipValue);
     try {
