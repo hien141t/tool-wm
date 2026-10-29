@@ -588,46 +588,62 @@
 
   function clickBetZone(tableId, bet, messageId, candidateIds = []) {
     try {
-      const doc = getTargetDoc();
+      const targetDocs = [getTargetDoc()];
+      if (!targetDocs.includes(document)) targetDocs.push(document);
+      const childIframes = Array.from(document.querySelectorAll('iframe'));
+      for (const ifr of childIframes) {
+        try {
+          const d = ifr.contentDocument || ifr.contentWindow?.document;
+          if (d && !targetDocs.includes(d)) targetDocs.push(d);
+        } catch (e) {}
+      }
+
       const betSuffix = bet === 'B' ? 'Banker' : 'Player';
       const allCandidates = Array.isArray(candidateIds) ? [...candidateIds] : [];
       if (tableId && !allCandidates.includes(tableId)) allCandidates.unshift(tableId);
 
       let betArea = null;
 
-      // 1. Thử theo danh sách Candidate IDs: doc.getElementById(`${cid}_betArea${betSuffix}`)
-      for (const cid of allCandidates) {
-        if (!cid) continue;
-        betArea = doc.getElementById(`${cid}_betArea${betSuffix}`);
-        if (betArea) break;
-      }
+      for (const doc of targetDocs) {
+        if (!doc) continue;
 
-      // 2. Thử theo XPath người dùng cung cấp: (//div[@id='${cid}_betArea${betSuffix}'])[1]
-      if (!betArea && doc.evaluate) {
+        // 1. Thử theo danh sách Candidate IDs: doc.getElementById(`${cid}_betArea${betSuffix}`)
         for (const cid of allCandidates) {
           if (!cid) continue;
-          try {
-            const xpath = `(//div[@id='${cid}_betArea${betSuffix}'])[1]`;
-            const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-            if (res && res.singleNodeValue) {
-              betArea = res.singleNodeValue;
-              break;
-            }
-          } catch (e) {}
-          try {
-            const xpathAny = `(//*[@id='${cid}_betArea${betSuffix}'])[1]`;
-            const res = doc.evaluate(xpathAny, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-            if (res && res.singleNodeValue) {
-              betArea = res.singleNodeValue;
-              break;
-            }
-          } catch (e) {}
+          betArea = doc.getElementById(`${cid}_betArea${betSuffix}`);
+          if (betArea) break;
         }
-      }
+        if (betArea) break;
 
-      // 3. Thử wildcard selector
-      if (!betArea) {
-        betArea = doc.querySelector(`[id$="_betArea${betSuffix}"], [id*="_betArea${betSuffix}"]`);
+        // 2. Thử theo XPath người dùng cung cấp: (//div[@id='${cid}_betArea${betSuffix}'])[1]
+        if (doc.evaluate) {
+          for (const cid of allCandidates) {
+            if (!cid) continue;
+            try {
+              const xpath = `(//div[@id='${cid}_betArea${betSuffix}'])[1]`;
+              const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+              if (res && res.singleNodeValue) {
+                betArea = res.singleNodeValue;
+                break;
+              }
+            } catch (e) {}
+            try {
+              const xpathAny = `(//*[@id='${cid}_betArea${betSuffix}'])[1]`;
+              const res = doc.evaluate(xpathAny, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+              if (res && res.singleNodeValue) {
+                betArea = res.singleNodeValue;
+                break;
+              }
+            } catch (e) {}
+          }
+          if (betArea) break;
+        }
+
+        // 3. Thử wildcard selector
+        try {
+          betArea = doc.querySelector(`[id$="_betArea${betSuffix}"], [id*="_betArea${betSuffix}"]`);
+          if (betArea) break;
+        } catch (e) {}
       }
 
       // 4. Tìm theo text trên H5 (loại trừ nút Pair / Đôi)

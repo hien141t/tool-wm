@@ -1322,29 +1322,44 @@ class WMAutoHelper {
     let bankerBtn = null;
     const docOwner = cardNode.ownerDocument || document;
 
-    // 1.1. Tìm trực tiếp theo ID nếu cleanId bắt đầu bằng groupMultiple_
-    if (cleanId && cleanId.startsWith('groupMultiple_')) {
-      playerBtn = cardNode.querySelector ? cardNode.querySelector(`[id="${cleanId}_betAreaPlayer"]`) : null;
-      if (!playerBtn && docOwner.getElementById) playerBtn = docOwner.getElementById(`${cleanId}_betAreaPlayer`);
+    // Lấy toàn bộ Candidate IDs của bàn (ví dụ: Bac 7 -> groupMultiple_101_507, groupMultiple_101_7, bac_7...)
+    const candidates = (typeof this.getCandidateTableIds === 'function') ? this.getCandidateTableIds({ id: cleanId, name: rawTitle, cardNode: cardNode }) : [];
+    if (cleanId && !candidates.includes(cleanId)) candidates.unshift(cleanId);
 
-      bankerBtn = cardNode.querySelector ? cardNode.querySelector(`[id="${cleanId}_betAreaBanker"]`) : null;
-      if (!bankerBtn && docOwner.getElementById) bankerBtn = docOwner.getElementById(`${cleanId}_betAreaBanker`);
+    // 1.1. Quét tìm theo Candidate IDs (getElementById & querySelector)
+    for (const cid of candidates) {
+      if (!cid) continue;
+      if (!playerBtn) {
+        playerBtn = (cardNode.querySelector ? cardNode.querySelector(`[id="${cid}_betAreaPlayer"]`) : null) ||
+                    (docOwner.getElementById ? docOwner.getElementById(`${cid}_betAreaPlayer`) : null);
+      }
+      if (!bankerBtn) {
+        bankerBtn = (cardNode.querySelector ? cardNode.querySelector(`[id="${cid}_betAreaBanker"]`) : null) ||
+                    (docOwner.getElementById ? docOwner.getElementById(`${cid}_betAreaBanker`) : null);
+      }
+      if (playerBtn && bankerBtn) break;
     }
 
-    // 1.2. Tìm bằng XPath chuẩn người dùng cung cấp: (//div[@id='...'])[1]
-    if (!playerBtn && cleanId && docOwner.evaluate) {
-      try {
-        const xp = `(//div[@id='${cleanId}_betAreaPlayer'])[1]`;
-        const res = docOwner.evaluate(xp, docOwner, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-        if (res && res.singleNodeValue) playerBtn = res.singleNodeValue;
-      } catch (e) {}
-    }
-    if (!bankerBtn && cleanId && docOwner.evaluate) {
-      try {
-        const xp = `(//div[@id='${cleanId}_betAreaBanker'])[1]`;
-        const res = docOwner.evaluate(xp, docOwner, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-        if (res && res.singleNodeValue) bankerBtn = res.singleNodeValue;
-      } catch (e) {}
+    // 1.2. Tìm bằng XPath chuẩn SC88 / WM Casino: (//div[@id='...'])[1]
+    if ((!playerBtn || !bankerBtn) && docOwner.evaluate) {
+      for (const cid of candidates) {
+        if (!cid) continue;
+        if (!playerBtn) {
+          try {
+            const xp = `(//div[@id='${cid}_betAreaPlayer'])[1]`;
+            const res = docOwner.evaluate(xp, docOwner, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+            if (res && res.singleNodeValue) playerBtn = res.singleNodeValue;
+          } catch (e) {}
+        }
+        if (!bankerBtn) {
+          try {
+            const xp = `(//div[@id='${cid}_betAreaBanker'])[1]`;
+            const res = docOwner.evaluate(xp, docOwner, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+            if (res && res.singleNodeValue) bankerBtn = res.singleNodeValue;
+          } catch (e) {}
+        }
+        if (playerBtn && bankerBtn) break;
+      }
     }
 
     // 1.3. Tìm bằng wildcard selector trong cardNode
@@ -2211,7 +2226,7 @@ class WMAutoHelper {
           window.removeEventListener('message', onMessage);
           resolve(false);
         }
-      }, 600);
+      }, 1500);
 
       const onMessage = (event) => {
         const data = event.data;
