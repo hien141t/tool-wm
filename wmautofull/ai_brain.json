@@ -1,122 +1,432 @@
 {
   "version": 1,
   "weights": {
-    "markov": 1.1770496000000001,
-    "streak": 1,
-    "table": 0.6
+    "markov": 1.2703471761831755,
+    "streak": 0.9716648361958318,
+    "table": 1.0337164159071734
   },
   "markovCounts": {
-    "B": {
-      "B": 18,
-      "P": 23,
-      "T": 4,
-      "total": 41
-    },
     "P": {
-      "B": 17,
-      "P": 18,
-      "T": 4,
-      "total": 35
-    },
-    "BB": {
-      "B": 15,
-      "P": 10,
-      "T": 2,
-      "total": 25
+      "B": 170,
+      "P": 145,
+      "total": 315
     },
     "PP": {
-      "B": 7,
+      "B": 75,
+      "P": 67,
+      "total": 142
+    },
+    "BPP": {
+      "B": 43,
+      "P": 32,
+      "total": 75
+    },
+    "BBPP": {
+      "B": 16,
+      "P": 11,
+      "total": 27
+    },
+    "PPP": {
+      "B": 30,
+      "P": 33,
+      "total": 63
+    },
+    "BPPP": {
+      "B": 15,
       "P": 15,
-      "T": 2,
-      "total": 22
+      "total": 30
     },
     "BP": {
-      "B": 15,
-      "P": 5,
-      "T": 2,
+      "B": 84,
+      "P": 74,
+      "total": 158
+    },
+    "BBP": {
+      "B": 45,
+      "P": 27,
+      "total": 72
+    },
+    "BBBP": {
+      "B": 23,
+      "P": 9,
+      "total": 32
+    },
+    "B": {
+      "B": 155,
+      "P": 164,
+      "total": 319
+    },
+    "BB": {
+      "B": 65,
+      "P": 80,
+      "total": 145
+    },
+    "BBB": {
+      "B": 23,
+      "P": 35,
+      "total": 58
+    },
+    "BBBB": {
+      "B": 6,
+      "P": 14,
       "total": 20
     },
     "PB": {
-      "B": 5,
-      "P": 18,
-      "T": 2,
-      "total": 23
-    },
-    "BBB": {
-      "B": 5,
-      "P": 13,
-      "T": 1,
-      "total": 18
-    },
-    "PPP": {
-      "B": 13,
-      "P": 5,
-      "T": 1,
-      "total": 18
+      "B": 82,
+      "P": 77,
+      "total": 159
     },
     "BPB": {
-      "B": 4,
-      "P": 15,
-      "T": 1,
-      "total": 19
+      "B": 38,
+      "P": 42,
+      "total": 80
+    },
+    "BBPB": {
+      "B": 17,
+      "P": 24,
+      "total": 41
+    },
+    "PPB": {
+      "B": 35,
+      "P": 33,
+      "total": 68
+    },
+    "PPPB": {
+      "B": 12,
+      "P": 14,
+      "total": 26
     },
     "PBP": {
-      "B": 12,
-      "P": 4,
-      "T": 1,
-      "total": 16
+      "B": 34,
+      "P": 44,
+      "total": 78
+    },
+    "BPBP": {
+      "B": 17,
+      "P": 24,
+      "total": 41
+    },
+    "PBPB": {
+      "B": 17,
+      "P": 16,
+      "total": 33
     },
     "PBB": {
-      "B": 0,
-      "P": 3,
-      "total": 3
+      "B": 40,
+      "P": 39,
+      "total": 79
+    },
+    "PPBB": {
+      "B": 17,
+      "P": 14,
+      "total": 31
+    },
+    "PPBP": {
+      "B": 16,
+      "P": 19,
+      "total": 35
+    },
+    "PBPP": {
+      "B": 26,
+      "P": 19,
+      "total": 45
+    },
+    "PBBB": {
+      "B": 15,
+      "P": 21,
+      "total": 36
+    },
+    "BPPB": {
+      "B": 22,
+      "P": 18,
+      "total": 40
+    },
+    "PBBP": {
+      "B": 14,
+      "P": 15,
+      "total": 29
     },
     "BPBB": {
-      "B": 0,
-      "P": 3,
-      "total": 3
+      "B": 17,
+      "P": 22,
+      "total": 39
+    },
+    "PPPP": {
+      "B": 15,
+      "P": 16,
+      "total": 31
     }
   },
   "streakStats": {
-    "B_2": {
-      "continue": 14,
-      "break": 9
-    },
     "P_2": {
-      "continue": 14,
-      "break": 6
-    },
-    "B_3": {
-      "continue": 5,
-      "break": 14
+      "continue": 34,
+      "break": 45
     },
     "P_3": {
-      "continue": 5,
-      "break": 14
+      "continue": 17,
+      "break": 15
+    },
+    "P_1": {
+      "continue": 74,
+      "break": 84
+    },
+    "B_8": {
+      "continue": 0,
+      "break": 1
     },
     "B_1": {
+      "continue": 82,
+      "break": 77
+    },
+    "B_2": {
+      "continue": 42,
+      "break": 45
+    },
+    "B_3": {
+      "continue": 17,
+      "break": 21
+    },
+    "P_4": {
+      "continue": 9,
+      "break": 6
+    },
+    "B_4": {
+      "continue": 3,
+      "break": 9
+    },
+    "P_5": {
+      "continue": 5,
+      "break": 5
+    },
+    "P_6": {
+      "continue": 2,
+      "break": 2
+    },
+    "P_7": {
       "continue": 0,
+      "break": 2
+    },
+    "B_5": {
+      "continue": 1,
       "break": 3
+    },
+    "B_6": {
+      "continue": 1,
+      "break": 0
+    },
+    "B_7": {
+      "continue": 0,
+      "break": 1
+    },
+    "B_21": {
+      "continue": 1,
+      "break": 0
     }
   },
   "tableShoeStats": {
-    "bac_test_01": {
-      "B": 0,
-      "P": 6,
+    "groupMultiple_101_1353": {
+      "B": 3,
+      "P": 3,
+      "T": 2,
+      "total": 8
+    },
+    "groupMultiple_101_931": {
+      "B": 7,
+      "P": 15,
+      "T": 1,
+      "total": 23
+    },
+    "groupMultiple_101_1355": {
+      "B": 4,
+      "P": 2,
       "T": 0,
       "total": 6
+    },
+    "groupMultiple_101_537": {
+      "B": 11,
+      "P": 11,
+      "T": 0,
+      "total": 22
+    },
+    "groupMultiple_101_1351": {
+      "B": 7,
+      "P": 7,
+      "T": 3,
+      "total": 17
+    },
+    "groupMultiple_101_936": {
+      "B": 1,
+      "P": 2,
+      "T": 0,
+      "total": 3
+    },
+    "groupMultiple_101_933": {
+      "B": 2,
+      "P": 1,
+      "T": 0,
+      "total": 3
+    },
+    "groupMultiple_101_507": {
+      "B": 0,
+      "P": 1,
+      "T": 0,
+      "total": 1
+    },
+    "groupMultiple_101_1357": {
+      "B": 2,
+      "P": 2,
+      "T": 0,
+      "total": 4
+    },
+    "groupMultiple_101_508": {
+      "B": 5,
+      "P": 4,
+      "T": 2,
+      "total": 11
+    },
+    "groupMultiple_101_1365": {
+      "B": 10,
+      "P": 9,
+      "T": 3,
+      "total": 22
+    },
+    "groupMultiple_108_6": {
+      "B": 0,
+      "P": 0,
+      "T": 4,
+      "total": 4
+    },
+    "groupMultiple_101_531": {
+      "B": 6,
+      "P": 4,
+      "T": 1,
+      "total": 11
+    },
+    "groupMultiple_101_938": {
+      "B": 8,
+      "P": 14,
+      "T": 2,
+      "total": 24
+    },
+    "groupMultiple_108_7": {
+      "B": 0,
+      "P": 0,
+      "T": 4,
+      "total": 4
+    },
+    "groupMultiple_101_1352": {
+      "B": 14,
+      "P": 10,
+      "T": 0,
+      "total": 24
+    },
+    "groupMultiple_101_935": {
+      "B": 8,
+      "P": 11,
+      "T": 5,
+      "total": 24
+    },
+    "groupMultiple_107_2": {
+      "B": 3,
+      "P": 6,
+      "T": 0,
+      "total": 9
+    },
+    "groupMultiple_101_1360": {
+      "B": 13,
+      "P": 9,
+      "T": 1,
+      "total": 23
+    },
+    "groupMultiple_101_1362": {
+      "B": 14,
+      "P": 6,
+      "T": 3,
+      "total": 23
+    },
+    "groupMultiple_101_1356": {
+      "B": 13,
+      "P": 10,
+      "T": 0,
+      "total": 23
+    },
+    "groupMultiple_101_530": {
+      "B": 10,
+      "P": 8,
+      "T": 2,
+      "total": 20
+    },
+    "groupMultiple_103_1415": {
+      "B": 1,
+      "P": 0,
+      "T": 0,
+      "total": 1
+    },
+    "groupMultiple_101_506": {
+      "B": 10,
+      "P": 7,
+      "T": 2,
+      "total": 19
+    },
+    "groupMultiple_101_533": {
+      "B": 6,
+      "P": 10,
+      "T": 2,
+      "total": 18
+    },
+    "groupMultiple_101_939": {
+      "B": 4,
+      "P": 9,
+      "T": 0,
+      "total": 13
+    },
+    "groupMultiple_101_1361": {
+      "B": 5,
+      "P": 5,
+      "T": 1,
+      "total": 11
+    },
+    "groupMultiple_102_540": {
+      "B": 0,
+      "P": 0,
+      "T": 1,
+      "total": 1
+    },
+    "groupMultiple_101_534": {
+      "B": 2,
+      "P": 3,
+      "T": 0,
+      "total": 5
+    },
+    "_sexy_bac_8": {
+      "B": 3,
+      "P": 1,
+      "T": 0,
+      "total": 4
+    },
+    "groupMultiple_101_937": {
+      "B": 0,
+      "P": 2,
+      "T": 0,
+      "total": 2
+    },
+    "bac_test_01": {
+      "B": 4,
+      "P": 4,
+      "T": 0,
+      "total": 8
     }
   },
   "stats": {
-    "totalRoundsObserved": 33,
-    "predictionsScored": 14,
-    "wins": 10,
-    "losses": 4,
-    "tiesPush": 1,
-    "accuracy": 0.7142857142857143,
+    "totalRoundsObserved": 740,
+    "predictionsScored": 273,
+    "wins": 142,
+    "losses": 131,
+    "tiesPush": 24,
+    "accuracy": 0.5201465201465202,
     "baselineAccuracy": 0.5,
-    "edgeOverBaseline": 0.2142857142857143,
-    "patternsLearnedCount": 17
+    "edgeOverBaseline": 0.020146520146520186,
+    "patternsLearnedCount": 46
   },
-  "updatedAt": "2026-10-29T08:16:13.113Z"
+  "updatedAt": "2026-10-29T08:34:55.308Z"
 }

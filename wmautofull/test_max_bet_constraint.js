@@ -233,6 +233,7 @@ async function runConstraintTests() {
   }
 
   console.log('🎉 TẤT CẢ CÁC BÀI KIỂM THỬ RÀNG BUỘC HẠN MỨC & CƯỢC ĐỒNG THỜI ĐỀU THÀNH CÔNG 100%!');
+  setTimeout(() => process.exit(0), 100);
 }
 
 runConstraintTests().catch(err => {

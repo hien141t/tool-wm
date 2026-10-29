@@ -468,62 +468,79 @@
     async loadSavedState() {
       await this.db.initPromise;
 
-      // 1. Ưu tiên cao nhất: Kiểm tra Local Sync Bridge (http://127.0.0.1:8421/brain)
-      // Giúp đọc trực tiếp từ file ai_brain.json dùng chung cho mọi Chrome Profile!
-      let loadedFromFile = false;
+      let brainData = null;
+      let bridgeConnected = false;
+
+      // 1. Nạp trực tiếp qua Background Service Worker (Không bị Mixed Content chặn)
       try {
-        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-        const timeoutId = controller ? setTimeout(() => controller.abort(), 1200) : null;
-        const resp = await fetch('http://127.0.0.1:8421/brain', {
-          method: 'GET',
-          cache: 'no-cache',
-          signal: controller ? controller.signal : undefined
-        });
-        if (timeoutId) clearTimeout(timeoutId);
-        if (resp.ok) {
-          const fileData = await resp.json();
-          if (fileData && fileData.weights) {
-            this.applyKnowledge(fileData);
-            this.bridgeConnected = true;
-            loadedFromFile = true;
-            console.log('[AI Engine] Đã kết nối Local Bridge và tải dữ liệu từ file ai_brain.json thành công!');
+        const bgRes = await new Promise((resolve) => {
+          if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+            chrome.runtime.sendMessage({ action: 'AI_FETCH_BRAIN' }, res => {
+              if (chrome.runtime.lastError) resolve(null);
+              else resolve(res);
+            });
+          } else {
+            resolve(null);
           }
+        });
+
+        if (bgRes && bgRes.success && bgRes.data) {
+          brainData = bgRes.data;
+          bridgeConnected = !!bgRes.bridgeConnected;
         }
-      } catch (err) {
-        this.bridgeConnected = false;
+      } catch (e) {}
+
+      // Fallback khi chạy ngoài môi trường Extension (ví dụ test NodeJS)
+      if (!brainData) {
+        try {
+          const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+          const timeoutId = controller ? setTimeout(() => controller.abort(), 1200) : null;
+          const resp = await fetch('http://127.0.0.1:8421/brain', {
+            method: 'GET',
+            cache: 'no-cache',
+            signal: controller ? controller.signal : undefined
+          });
+          if (timeoutId) clearTimeout(timeoutId);
+          if (resp.ok) {
+            const fileData = await resp.json();
+            if (fileData && fileData.weights) {
+              brainData = fileData;
+              bridgeConnected = true;
+            }
+          }
+        } catch (err) {}
       }
 
-      if (!loadedFromFile) {
-        // 2. Kiểm tra IndexedDB của Profile hiện tại
-        const savedKnowledge = await this.db.loadKnowledge('ai_engine_weights');
-        if (savedKnowledge) {
-          if (savedKnowledge.weights) this.ensemble.weights = savedKnowledge.weights;
-          if (savedKnowledge.markovCounts) this.markov.ngramCounts = savedKnowledge.markovCounts;
-          if (savedKnowledge.streakStats) this.streak.streakStats = savedKnowledge.streakStats;
-          if (savedKnowledge.tableShoeStats) this.tableLearner.tableShoeStats = savedKnowledge.tableShoeStats;
-        } else {
-          // 3. Nếu IndexedDB trống (Profile mới), đọc file ai_brain.json đóng gói sẵn trong extension!
-          try {
-            const bundledUrl = (typeof chrome !== 'undefined' && chrome.runtime?.getURL) ? chrome.runtime.getURL('ai_brain.json') : null;
-            if (bundledUrl) {
-              const bResp = await fetch(bundledUrl);
-              if (bResp.ok) {
-                const bData = await bResp.json();
-                this.applyKnowledge(bData);
-                loadedFromFile = true;
-              }
-            }
-          } catch (e) {}
+      // Đọc dữ liệu IndexedDB hiện tại
+      let savedKnowledge = null;
+      let savedStats = null;
+      try {
+        savedKnowledge = await this.db.loadKnowledge('ai_engine_weights');
+        savedStats = await this.db.loadKnowledge('ai_engine_stats');
+      } catch (e) {}
 
-          if (!loadedFromFile) {
-            this.loadPretrainedBaseline();
-          }
-        }
+      const fileRounds = (brainData && brainData.stats) ? (brainData.stats.totalRoundsObserved || 0) : 0;
+      const idbRounds = (savedStats && savedStats.totalRoundsObserved) ? savedStats.totalRoundsObserved : 0;
 
-        const savedStats = await this.db.loadKnowledge('ai_engine_stats');
-        if (savedStats) {
-          this.stats = Object.assign(this.stats, savedStats);
-        }
+      // Nếu file não có dữ liệu (hoặc IndexedDB rỗng / ít hơn file)
+      if (brainData && (fileRounds >= idbRounds || idbRounds === 0)) {
+        this.applyKnowledge(brainData);
+        this.bridgeConnected = bridgeConnected;
+        console.log(`[AI Engine] Đã nạp trực tiếp bộ não AI thành công! (${fileRounds} ván | ${this.stats.patternsLearnedCount} mẫu)`);
+        await this.persistKnowledge();
+      } else if (savedKnowledge) {
+        if (savedKnowledge.weights) this.ensemble.weights = savedKnowledge.weights;
+        if (savedKnowledge.markovCounts) this.markov.ngramCounts = savedKnowledge.markovCounts;
+        if (savedKnowledge.streakStats) this.streak.streakStats = savedKnowledge.streakStats;
+        if (savedKnowledge.tableShoeStats) this.tableLearner.tableShoeStats = savedKnowledge.tableShoeStats;
+        if (savedStats) this.stats = Object.assign(this.stats, savedStats);
+        this.bridgeConnected = bridgeConnected;
+      } else if (brainData) {
+        this.applyKnowledge(brainData);
+        this.bridgeConnected = bridgeConnected;
+        await this.persistKnowledge();
+      } else {
+        this.loadPretrainedBaseline();
       }
 
       this.notifyStats();
@@ -611,7 +628,18 @@
         await this.db.saveKnowledge('ai_engine_stats', this.stats);
       } catch (e) {}
 
-      // Tự động lưu thẳng vào file ai_brain.json qua Local Bridge (nếu đang chạy)
+      // 1. Tự động lưu qua Background Service Worker (Vượt Mixed Content & CORS an toàn)
+      try {
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({ action: 'AI_SAVE_BRAIN', payload }, res => {
+            if (res && res.bridgeSaved) {
+              this.bridgeConnected = true;
+            }
+          });
+        }
+      } catch (e) {}
+
+      // 2. Fallback trực tiếp cho NodeJS test runner
       try {
         const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
         const timeoutId = controller ? setTimeout(() => controller.abort(), 1500) : null;
@@ -625,9 +653,7 @@
         if (resp.ok) {
           this.bridgeConnected = true;
         }
-      } catch (err) {
-        this.bridgeConnected = false;
-      }
+      } catch (err) {}
     }
 
     setTradingMode(mode) {

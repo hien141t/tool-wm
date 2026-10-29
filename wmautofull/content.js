@@ -657,6 +657,11 @@ class WMAutoHelper {
         this.renderAIStats(stats, mode, bridgeConnected);
       };
       this.renderAIStats(this.aiEngine.stats, this.aiEngine.tradingMode, this.aiEngine.bridgeConnected);
+      if (this.aiEngine.isReadyPromise) {
+        this.aiEngine.isReadyPromise.then(() => {
+          this.renderAIStats(this.aiEngine.stats, this.aiEngine.tradingMode, this.aiEngine.bridgeConnected);
+        });
+      }
     }
 
     // Nút Bắt đầu / Dừng
@@ -2321,9 +2326,15 @@ class WMAutoHelper {
     const bridgeIndicator = document.getElementById('wm-ai-bridge-status');
     if (bridgeIndicator) {
       if (isBridge) {
-        bridgeIndicator.innerHTML = '<span style="color:#10b981; font-weight:600;">🟢 Tự động lưu: <b>ai_brain.json</b> (Đã kết nối)</span>';
+        bridgeIndicator.innerHTML = '<span style="color:#10b981; font-weight:600;">🟢 Tự động lưu: <b>ai_brain.json</b> (Đã kết nối trực tiếp)</span>';
       } else {
-        bridgeIndicator.innerHTML = '<span style="color:#94a3b8;" title="Chạy start_sync.bat trong thư mục extension để tự động ghi đè file">⚪ File Sync: Chạy <code>start_sync.bat</code> để tự lưu vào file</span>';
+        const rounds = stats.totalRoundsObserved || 0;
+        const patterns = stats.patternsLearnedCount || 0;
+        if (rounds > 0) {
+          bridgeIndicator.innerHTML = `<span style="color:#38bdf8;" title="Chạy start_sync.bat nếu muốn tự động ghi đè file">📁 Đã nạp não từ: <b>ai_brain.json</b> (${rounds} ván | ${patterns} mẫu)</span>`;
+        } else {
+          bridgeIndicator.innerHTML = '<span style="color:#94a3b8;" title="Chạy start_sync.bat trong thư mục extension để tự động ghi đè file">⚪ File Sync: Chạy <code>start_sync.bat</code> để tự lưu vào file</span>';
+        }
       }
     }
 

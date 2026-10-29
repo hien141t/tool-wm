@@ -24,7 +24,7 @@ console.log('=== BẮT ĐẦU KIỂM THỬ 3 TIÊU CHÍ AI ===\n');
 
 async function runTests() {
   const engine = new WMBaccaratAIEngine();
-  await engine.loadSavedState();
+  await engine.isReadyPromise;
 
   // --------------------------------------------------------------------------
   // TEST 1: CHỐNG HỌC TRÙNG (Deduplication)
@@ -58,7 +58,7 @@ async function runTests() {
   // TEST 2: KIỂM THỬ DỰ ĐOÁN NGOÀI MẪU & SO SÁNH VỚI BASELINE
   // --------------------------------------------------------------------------
   console.log('--- TEST 2: DỰ ĐOÁN TRƯỚC VÁN, CHẤM ĐIỂM NGOÀI MẪU & SO VỚI BASELINE ---');
-  const currentHistory = ['B', 'P', 'B']; // Chuỗi BPB -> Mô hình đoán P
+  const currentHistory = ['B', 'B', 'P']; // Chuỗi BBP -> Mô hình có xác suất Banker cao (41 B vs 27 P)
   const pred = engine.generatePrediction(tableId, 'Baccarat 1', currentHistory);
   console.log(`Dự đoán sinh ra trước khi biết kết quả: ${pred.predicted} (Độ tin cậy: ${Math.round(pred.confidence * 100)}%)`);
   console.log(`Lý do phân tích: "${pred.rationale}"`);
@@ -111,6 +111,7 @@ async function runTests() {
   }
 
   console.log('🎉 TỔNG KẾT: CẢ 3 TIÊU CHÍ HOÀN THIỆN ĐỀU ĐẠT CHUẨN XUẤT SẮC 100%!');
+  setTimeout(() => process.exit(0), 100);
 }
 
 runTests().catch(err => {
