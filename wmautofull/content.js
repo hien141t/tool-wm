@@ -21,12 +21,11 @@ class WMAutoHelper {
     // Cấu hình mặc định
     this.selectedChip = 10;
     this.maxTables = 20;
-    this.patterns = [
-      { condition: 'PBB', bet: 'P' },
-      { condition: 'BBP', bet: 'B' },
-      { condition: 'PPBB', bet: 'P' },
-      { condition: 'BBPP', bet: 'B' }
-    ];
+
+    // Bộ não AI Baccarat thích ứng trực tuyến (Online Adaptive Multi-Model AI Engine)
+    this.aiEngine = window.WMBaccaratAIEngine ? new window.WMBaccaratAIEngine() : null;
+    this.tableLastHistory = new Map();
+    this.recentPredictionsLog = [];
 
     // Trạng thái bàn & Thống kê
     this.tablesMap = new Map();
@@ -246,19 +245,83 @@ class WMAutoHelper {
           </div>
         </div>
 
-        <div class="wm-card">
-          <div class="wm-card-title">
-            <span>🎯 Điều kiện bắt cầu (Công thức)</span>
-            <span style="font-size:10px; color:#888;">(Cầu=Đánh)</span>
+        <div class="wm-card wm-ai-card">
+          <div class="wm-card-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>🤖 AI Learning Center (Học & Dự Đoán Tự Động)</span>
+            <span class="wm-ai-mode-pill" id="wm-ai-mode-badge">MÔ PHỎNG (PAPER)</span>
           </div>
-          <textarea class="wm-textarea" id="wm-patterns-input" rows="4" placeholder="PBB=P&#10;BBP=B&#10;PPBB=P&#10;BBPP=B"></textarea>
-          
-          <div style="font-size:10.5px; color:#94a3b8; margin-top:6px;">Nạp nhanh mẫu cầu:</div>
-          <div class="wm-quick-patterns">
-            <button class="wm-chip-pill-btn" data-preset="baccarat-basic">Cơ bản (PBB=P, BBP=B)</button>
-            <button class="wm-chip-pill-btn" data-preset="break-3">Bẻ 3 cây (PPP=B, BBB=P)</button>
-            <button class="wm-chip-pill-btn" data-preset="follow-run">Bệt (PPPP=P, BBBB=B)</button>
-            <button class="wm-chip-pill-btn" data-preset="ping-pong">Cầu 1-1 (PBP=B, BPB=P)</button>
+
+          <!-- Chốt an toàn / Chế độ giao dịch -->
+          <div class="wm-ai-mode-bar">
+            <span style="font-size:11px; color:#94a3b8; font-weight:600;">Chế độ cược:</span>
+            <div class="wm-ai-mode-toggle">
+              <button type="button" class="wm-mode-btn active" id="wm-mode-paper-btn">🟢 Paper Trading (Mô phỏng)</button>
+              <button type="button" class="wm-mode-btn" id="wm-mode-real-btn">🔴 Cược thật (Real Bet)</button>
+            </div>
+          </div>
+
+          <!-- Thống kê AI thời gian thực -->
+          <div class="wm-ai-stats-grid">
+            <div class="wm-ai-stat-box">
+              <div class="wm-ai-stat-val" id="wm-ai-total-rounds">0</div>
+              <div class="wm-ai-stat-lbl">Ván đã ghi nhận</div>
+            </div>
+            <div class="wm-ai-stat-box">
+              <div class="wm-ai-stat-val" id="wm-ai-scored">0</div>
+              <div class="wm-ai-stat-lbl">Dự đoán đã chấm</div>
+            </div>
+            <div class="wm-ai-stat-box">
+              <div class="wm-ai-stat-val" id="wm-ai-accuracy" style="color:#00ff88;">0.0%</div>
+              <div class="wm-ai-stat-lbl">Độ chính xác</div>
+            </div>
+            <div class="wm-ai-stat-box">
+              <div class="wm-ai-stat-val" id="wm-ai-pending" style="color:#38bdf8;">0</div>
+              <div class="wm-ai-stat-lbl">Đang chờ kết quả</div>
+            </div>
+          </div>
+
+          <!-- Trạng thái học -->
+          <div class="wm-ai-learning-status">
+            <div class="wm-ai-status-row">
+              <span class="lbl">🧬 Mẫu cầu đã tích lũy:</span>
+              <span class="val" id="wm-ai-patterns">0 mẫu (N-gram & Nhịp cầu)</span>
+            </div>
+            <div class="wm-ai-status-row">
+              <span class="lbl">🏆 Mô hình dẫn đầu:</span>
+              <span class="val" id="wm-ai-top-model">Markov N-gram (Order 3)</span>
+            </div>
+            <div class="wm-ai-status-row">
+              <span class="lbl">⚡ Trạng thái:</span>
+              <span class="val" style="color:#34d399;">Học trực tuyến liên tục (Online Adaptive)</span>
+            </div>
+          </div>
+
+          <!-- Bảng dự đoán mới nhất & giải thích lý do -->
+          <div style="font-size:11px; font-weight:bold; color:#cbd5e1; margin-top:10px; margin-bottom:5px;">
+            📋 Nhật ký dự đoán & Giải thích lý do (Explainability):
+          </div>
+          <div class="wm-ai-log-table-wrap">
+            <table class="wm-table wm-ai-table">
+              <thead>
+                <tr>
+                  <th>Bàn</th>
+                  <th>Dự đoán</th>
+                  <th>Xác suất</th>
+                  <th>Lý do phân tích</th>
+                  <th>Thật</th>
+                  <th>Kết quả</th>
+                </tr>
+              </thead>
+              <tbody id="wm-ai-predictions-body">
+                <tr>
+                  <td colspan="6" style="text-align:center; color:#64748b; padding:12px;">Đang quét bàn để thu thập dữ liệu học trực tuyến...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+            <button type="button" class="wm-clear-log-btn" id="wm-ai-reset-memory-btn">🧹 Đặt lại bộ nhớ học</button>
+            <span style="font-size:10px; color:#64748b;">Lưu cục bộ IndexedDB • Không gửi ra ngoài</span>
           </div>
         </div>
       </div>
@@ -404,23 +467,61 @@ class WMAutoHelper {
       this.addLog(`Số bàn tối đa theo dõi: ${this.maxTables}`, 'info');
     });
 
-    // Nạp nhanh mẫu cầu
-    this.overlay.querySelectorAll('.wm-chip-pill-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const preset = btn.getAttribute('data-preset');
-        const textarea = document.getElementById('wm-patterns-input');
-        if (preset === 'baccarat-basic') {
-          textarea.value = "PBB=P\nBBP=B\nPPBB=P\nBBPP=B";
-        } else if (preset === 'break-3') {
-          textarea.value = "PPP=B\nBBB=P\nPPPP=B\nBBBB=P";
-        } else if (preset === 'follow-run') {
-          textarea.value = "PPPP=P\nBBBB=B\nPPPPP=P\nBBBBB=B";
-        } else if (preset === 'ping-pong') {
-          textarea.value = "PBP=B\nBPB=P\nPBPB=P\nBPBP=B";
+    // Chế độ cược AI: Paper Trading vs Real Bet
+    const paperBtn = document.getElementById('wm-mode-paper-btn');
+    const realBtn = document.getElementById('wm-mode-real-btn');
+    if (paperBtn) {
+      paperBtn.addEventListener('click', () => {
+        if (this.aiEngine) {
+          this.aiEngine.setTradingMode('PAPER');
+          this.addLog('🛡️ Đã chuyển sang chế độ: PAPER TRADING (Mô phỏng an toàn - không đặt cược thật)', 'info');
         }
-        this.parsePatterns();
       });
-    });
+    }
+    if (realBtn) {
+      realBtn.addEventListener('click', () => {
+        if (this.aiEngine) {
+          this.aiEngine.setTradingMode('REAL');
+          this.addLog('⚠️ Đã chuyển sang chế độ: CƯỢC THẬT (Bot sẽ tự đặt tiền thật khi bấm Bắt đầu)', 'warning');
+        }
+      });
+    }
+
+    // Đặt lại bộ nhớ học AI
+    const resetAiBtn = document.getElementById('wm-ai-reset-memory-btn');
+    if (resetAiBtn) {
+      resetAiBtn.addEventListener('click', async () => {
+        if (confirm('Bạn có chắc chắn muốn đặt lại toàn bộ dữ liệu học AI trên máy này?')) {
+          if (this.aiEngine) {
+            await this.aiEngine.db.clearAll();
+            this.aiEngine.stats = {
+              totalRoundsObserved: 0,
+              predictionsScored: 0,
+              wins: 0,
+              losses: 0,
+              tiesPush: 0,
+              accuracy: 0,
+              patternsLearnedCount: 0
+            };
+            this.aiEngine.markov.ngramCounts = {};
+            this.aiEngine.streak.streakStats = {};
+            this.aiEngine.tableLearner.tableShoeStats = {};
+            this.aiEngine.notifyStats();
+            this.recentPredictionsLog = [];
+            this.updateAILogTable();
+            this.addLog('🧹 Đã xóa toàn bộ bộ nhớ học AI.', 'info');
+          }
+        }
+      });
+    }
+
+    // Kết nối sự kiện cập nhật thống kê AI
+    if (this.aiEngine) {
+      this.aiEngine.onStatsChange = (stats, mode) => {
+        this.renderAIStats(stats, mode);
+      };
+      this.renderAIStats(this.aiEngine.stats, this.aiEngine.tradingMode);
+    }
 
     // Nút Bắt đầu / Dừng
     document.getElementById('wm-start-btn').addEventListener('click', () => this.start());
@@ -635,34 +736,6 @@ class WMAutoHelper {
   }
 
   parsePatterns() {
-    const input = document.getElementById('wm-patterns-input');
-    const text = input ? input.value.trim() : '';
-    if (!text) {
-      this.addLog('Chưa nhập điều kiện bắt cầu!', 'warning');
-      return false;
-    }
-
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const newPatterns = [];
-
-    for (const line of lines) {
-      const match = line.toUpperCase().match(/^([PB]+)=([PB])$/);
-      if (match) {
-        newPatterns.push({ condition: match[1], bet: match[2] });
-      } else {
-        this.addLog(`Điều kiện không hợp lệ: ${line}`, 'warning');
-        return false;
-      }
-    }
-
-    if (newPatterns.length === 0) {
-      this.addLog('Không có điều kiện nào hợp lệ!', 'warning');
-      return false;
-    }
-
-    newPatterns.sort((a, b) => b.condition.length - a.condition.length);
-    this.patterns = newPatterns;
-    this.saveSettings();
     return true;
   }
 
@@ -736,6 +809,26 @@ class WMAutoHelper {
       allFound.forEach(t => {
         const existing = this.tablesMap.get(t.id);
         if (existing) {
+          const oldHist = existing.history || [];
+          const newHist = t.history || [];
+          if (newHist.length > oldHist.length) {
+            const newOutcome = newHist[newHist.length - 1];
+            if (this.aiEngine) {
+              this.aiEngine.onRoundCompleted(t.id, t.name || existing.name || t.id, oldHist, newOutcome);
+              const recentLog = this.recentPredictionsLog.find(p => p.tableId === t.id && p.status === 'PENDING');
+              if (recentLog) {
+                recentLog.actualOutcome = newOutcome;
+                if (newOutcome === 'T') {
+                  recentLog.status = 'TIE_PUSH';
+                } else if (recentLog.predicted === newOutcome) {
+                  recentLog.status = 'WIN';
+                } else {
+                  recentLog.status = 'LOSS';
+                }
+                this.updateAILogTable();
+              }
+            }
+          }
           existing.name = t.name || existing.name;
           existing.betTime = (t.betTime !== undefined && t.betTime !== null) ? t.betTime : existing.betTime;
           if (t.history && t.history.length > 0) existing.history = t.history;
@@ -1345,15 +1438,13 @@ class WMAutoHelper {
     const maxTablesInput = document.getElementById('wm-max-tables');
     if (maxTablesInput) maxTablesInput.disabled = locked;
 
-    const patternsInput = document.getElementById('wm-patterns-input');
-    if (patternsInput) patternsInput.disabled = locked;
+    const paperBtn = document.getElementById('wm-mode-paper-btn');
+    const realBtn = document.getElementById('wm-mode-real-btn');
+    if (paperBtn) paperBtn.disabled = locked;
+    if (realBtn) realBtn.disabled = locked;
 
-    const presetButtons = this.overlay.querySelectorAll('.wm-chip-pill-btn');
-    presetButtons.forEach(btn => {
-      btn.disabled = locked;
-      btn.style.pointerEvents = locked ? 'none' : 'auto';
-      btn.style.opacity = locked ? '0.45' : '1';
-    });
+    const resetBtn = document.getElementById('wm-ai-reset-memory-btn');
+    if (resetBtn) resetBtn.disabled = locked;
   }
 
   // ==========================================================================
@@ -1406,30 +1497,39 @@ class WMAutoHelper {
 
     if (!history || history.length < 2) return;
 
-    // Lọc riêng B/P cho soi cầu (ván Hòa không làm hỏng chuỗi cầu)
-    const bpHistory = history.filter(r => r === 'B' || r === 'P');
-    if (bpHistory.length < 2) return;
-
     const state = this.tableStates[tableId] || { lastHistorySignature: '', betPlaced: false };
     const currentSignature = history.join('');
 
     if (currentSignature !== state.lastHistorySignature) {
       state.lastHistorySignature = currentSignature;
-      state.betPlaced = false; // Ván mới đã ra kết quả -> mở lại quyền cược
+      state.betPlaced = false; // Ván mới đã ra kết quả -> sẵn sàng nhận định vòng tiếp theo
     }
 
-    // Thời gian cược hợp lệ: từ 6s đến 25s (hoặc nếu betTime = 0 thì dựa vào trạng thái mở)
-    const canBet = (betTime === 0 || (betTime >= 6 && betTime <= 25)) && !state.betPlaced;
+    // Thời gian cược hợp lệ: từ 5s đến 25s (hoặc nếu betTime = 0 thì dựa vào trạng thái mở)
+    const canBet = (betTime === 0 || (betTime >= 5 && betTime <= 25)) && !state.betPlaced;
 
-    if (canBet) {
-      for (const pattern of this.patterns) {
-        if (this.matchesPattern(bpHistory, pattern.condition)) {
-          state.betPlaced = true;
-          this.tableStates[tableId] = state;
+    if (canBet && this.aiEngine) {
+      // 1. Gọi Online Adaptive Multi-Model AI Engine dự đoán
+      const prediction = this.aiEngine.generatePrediction(tableId, table.name || tableId, history);
 
-          this.addLog(`🎯 ${table.name || tableId} KHỚP CẦU: ${pattern.condition} ➔ Đánh ${pattern.bet === 'B' ? 'BANKER' : 'PLAYER'}`, 'success');
-          await this.executeBet(table, pattern);
-          break;
+      if (prediction && prediction.predicted && prediction.predicted !== 'PASS') {
+        state.betPlaced = true;
+        this.tableStates[tableId] = state;
+
+        // 2. Thêm vào nhật ký Explainability trên dashboard
+        this.addAIPredictionToLog(prediction);
+
+        const targetSide = prediction.predicted; // 'B' hoặc 'P'
+        const sideName = targetSide === 'B' ? 'Banker' : 'Player';
+        const confPercent = Math.round((prediction.confidence || 0.5) * 100);
+
+        if (prediction.shouldBet) {
+          // CHẾ ĐỘ REAL BET: Người dùng chủ động bật "Cược thật" -> Đặt cược thật
+          this.addLog(`⚡ [AI REAL BET] ${prediction.tableName} ➔ Dự đoán ${sideName} (${confPercent}%) | ${prediction.rationale}`, 'success');
+          await this.executeBet(table, targetSide, prediction.rationale);
+        } else {
+          // CHẾ ĐỘ PAPER TRADING (MẶC ĐỊNH): Mô phỏng an toàn, tuyệt đối không đặt tiền thật!
+          this.addLog(`🤖 [AI PAPER] ${prediction.tableName} ➔ Dự đoán ${sideName} (${confPercent}%) | ${prediction.rationale}`, 'info');
         }
       }
     }
@@ -1563,8 +1663,8 @@ class WMAutoHelper {
     } catch (err) {}
   }
 
-  async executeBet(table, pattern) {
-    const betTarget = pattern.bet;
+  async executeBet(table, pattern, reason = '') {
+    const betTarget = typeof pattern === 'string' ? pattern : (pattern.bet || 'B');
     const betTargetName = betTarget === 'B' ? 'Banker' : 'Player';
     const currentChip = this.actualGameChip || this.selectedChip;
     const amount = currentChip;
@@ -1614,7 +1714,7 @@ class WMAutoHelper {
       bet: betTarget,
       chip: currentChip,
       amount: amount,
-      pattern: `${pattern.condition}=${pattern.bet}`,
+      pattern: reason || (typeof pattern === 'string' ? `AI-${betTarget}` : `${pattern.condition}=${pattern.bet}`),
       success: betSuccess,
       historyLengthAtBet: (table.history || []).length,
       historySigAtBet: (table.history || []).join(''),
@@ -1819,6 +1919,152 @@ class WMAutoHelper {
   }
 
   // ==========================================================================
+  // HIỂN THỊ THỐNG KÊ & NHẬT KÝ DỰ ĐOÁN AI (AI LEARNING CENTER)
+  // ==========================================================================
+  renderAIStats(stats, mode) {
+    if (!this.overlay) return;
+
+    // 1. Cập nhật Badge Mode & Nút
+    const badge = document.getElementById('wm-ai-mode-badge');
+    const paperBtn = document.getElementById('wm-mode-paper-btn');
+    const realBtn = document.getElementById('wm-mode-real-btn');
+
+    if (badge) {
+      if (mode === 'REAL') {
+        badge.textContent = 'CƯỢC THẬT (REAL)';
+        badge.className = 'wm-ai-mode-pill real';
+      } else {
+        badge.textContent = 'MÔ PHỎNG (PAPER)';
+        badge.className = 'wm-ai-mode-pill';
+      }
+    }
+
+    if (paperBtn && realBtn) {
+      if (mode === 'REAL') {
+        paperBtn.classList.remove('active');
+        realBtn.classList.add('active');
+      } else {
+        paperBtn.classList.add('active');
+        realBtn.classList.remove('active');
+      }
+    }
+
+    // 2. Thống kê 4 ô
+    const totalEl = document.getElementById('wm-ai-total-rounds');
+    if (totalEl) totalEl.textContent = stats.totalRoundsObserved || 0;
+
+    const scoredEl = document.getElementById('wm-ai-scored');
+    if (scoredEl) scoredEl.textContent = `${stats.predictionsScored || 0} (${stats.wins || 0}W-${stats.losses || 0}L)`;
+
+    const accEl = document.getElementById('wm-ai-accuracy');
+    if (accEl) {
+      const pct = ((stats.accuracy || 0) * 100).toFixed(1);
+      accEl.textContent = `${pct}%`;
+      accEl.style.color = (stats.accuracy >= 0.52) ? '#00ff88' : ((stats.accuracy >= 0.48) ? '#facc15' : '#ef4444');
+    }
+
+    const pendingEl = document.getElementById('wm-ai-pending');
+    if (pendingEl) {
+      const pendingCount = this.aiEngine ? this.aiEngine.pendingPredictions.size : 0;
+      pendingEl.textContent = pendingCount;
+    }
+
+    // 3. Mẫu cầu và mô hình dẫn đầu
+    const patternsEl = document.getElementById('wm-ai-patterns');
+    if (patternsEl) {
+      patternsEl.textContent = `${stats.patternsLearnedCount || 0} mẫu (N-gram & Nhịp cầu)`;
+    }
+
+    const topModelEl = document.getElementById('wm-ai-top-model');
+    if (topModelEl && this.aiEngine && this.aiEngine.ensemble) {
+      const weights = this.aiEngine.ensemble.weights;
+      let bestName = 'Markov N-gram';
+      let maxW = -1;
+      const nameMap = { markov: 'Markov N-gram', streak: 'Streak / Bệt / Đảo', table: 'Cân bằng Bàn (Shoe)' };
+      for (const [k, w] of Object.entries(weights)) {
+        if (w > maxW) {
+          maxW = w;
+          bestName = nameMap[k] || k;
+        }
+      }
+      topModelEl.textContent = `${bestName} (Trọng số ${maxW.toFixed(2)})`;
+    }
+  }
+
+  addAIPredictionToLog(prediction) {
+    if (!prediction || !prediction.predicted || prediction.predicted === 'PASS') return;
+
+    const item = {
+      id: prediction.predictionRecord?.id || ('pred_' + Date.now()),
+      tableId: prediction.tableId,
+      tableName: prediction.tableName || prediction.tableId,
+      predicted: prediction.predicted,
+      prob: Math.round(((prediction.predicted === 'B' ? prediction.probB : prediction.probP) || 0.5) * 100),
+      reason: prediction.rationale || 'Đánh giá đa mô hình',
+      mode: prediction.isPaperTrading ? 'PAPER' : 'REAL',
+      time: new Date().toLocaleTimeString('vi-VN'),
+      actualOutcome: null,
+      status: 'PENDING'
+    };
+
+    const existingIdx = this.recentPredictionsLog.findIndex(p => p.tableId === item.tableId && p.status === 'PENDING');
+    if (existingIdx >= 0) {
+      this.recentPredictionsLog[existingIdx] = item;
+    } else {
+      this.recentPredictionsLog.unshift(item);
+      if (this.recentPredictionsLog.length > 30) this.recentPredictionsLog.pop();
+    }
+
+    this.updateAILogTable();
+  }
+
+  updateAILogTable() {
+    const tbody = document.getElementById('wm-ai-predictions-body');
+    if (!tbody) return;
+
+    if (!this.recentPredictionsLog || this.recentPredictionsLog.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align:center; color:#64748b; padding:12px;">
+            Đang quét bàn để thu thập dữ liệu học trực tuyến...
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = this.recentPredictionsLog.slice(0, 10).map(item => {
+      const predBadge = item.predicted === 'B'
+        ? '<span class="wm-badge-bet banker" style="font-size:10px; padding:2px 6px;">🔴 B</span>'
+        : '<span class="wm-badge-bet player" style="font-size:10px; padding:2px 6px;">🔵 P</span>';
+
+      let statusBadge = '<span class="wm-badge-result pending" style="font-size:10px;">⏳ Chờ</span>';
+      if (item.status === 'WIN') {
+        statusBadge = '<span class="wm-badge-result win" style="font-size:10px;">✅ ĐÚNG</span>';
+      } else if (item.status === 'LOSS') {
+        statusBadge = '<span class="wm-badge-result loss" style="font-size:10px;">❌ SAI</span>';
+      } else if (item.status === 'TIE_PUSH') {
+        statusBadge = '<span class="wm-badge-result tie" style="font-size:10px;">🟡 HÒA</span>';
+      }
+
+      const modeBadge = item.mode === 'REAL' 
+        ? '<span style="color:#ef4444; font-size:10px; font-weight:bold;">REAL</span>' 
+        : '<span style="color:#94a3b8; font-size:10px;">PAPER</span>';
+
+      return `
+        <tr>
+          <td style="font-weight:600; color:#f1f5f9;">${item.tableName}</td>
+          <td>${predBadge}</td>
+          <td><b style="color:#00ff88;">${item.prob}%</b></td>
+          <td style="max-width:200px; font-size:10.5px; color:#cbd5e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${item.reason}">${item.reason}</td>
+          <td>${modeBadge}</td>
+          <td>${statusBadge}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // ==========================================================================
   // XỬ LÝ GÓI TIN WEBSOCKET & POSTMESSAGE
   // ==========================================================================
   setupMessageListener() {
@@ -1832,6 +2078,26 @@ class WMAutoHelper {
           if (!t || !t.id) return;
           const existing = this.tablesMap.get(t.id);
           if (existing) {
+            const oldHist = existing.history || [];
+            const newHist = t.history || [];
+            if (newHist.length > oldHist.length) {
+              const newOutcome = newHist[newHist.length - 1];
+              if (this.aiEngine) {
+                this.aiEngine.onRoundCompleted(t.id, t.name || existing.name || t.id, oldHist, newOutcome);
+                const recentLog = this.recentPredictionsLog.find(p => p.tableId === t.id && p.status === 'PENDING');
+                if (recentLog) {
+                  recentLog.actualOutcome = newOutcome;
+                  if (newOutcome === 'T') {
+                    recentLog.status = 'TIE_PUSH';
+                  } else if (recentLog.predicted === newOutcome) {
+                    recentLog.status = 'WIN';
+                  } else {
+                    recentLog.status = 'LOSS';
+                  }
+                  this.updateAILogTable();
+                }
+              }
+            }
             existing.name = t.name || existing.name;
             existing.betTime = (t.betTime !== undefined && t.betTime !== null) ? t.betTime : existing.betTime;
             if (t.history && t.history.length > 0) existing.history = t.history;
