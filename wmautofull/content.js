@@ -20,7 +20,6 @@ class WMAutoHelper {
 
     // Cấu hình mặc định
     this.selectedChip = 10;
-    this.totalBets = 2;
     this.maxTables = 20;
     this.patterns = [
       { condition: 'PBB', bet: 'P' },
@@ -81,9 +80,6 @@ class WMAutoHelper {
       const chip = localStorage.getItem('wm_chip');
       if (chip) this.selectedChip = parseInt(chip);
 
-      const totalBets = localStorage.getItem('wm_total_bets');
-      if (totalBets) this.totalBets = parseInt(totalBets);
-
       const maxTables = localStorage.getItem('wm_max_tables');
       if (maxTables) this.maxTables = parseInt(maxTables);
 
@@ -95,7 +91,6 @@ class WMAutoHelper {
   saveSettings() {
     try {
       localStorage.setItem('wm_chip', this.selectedChip);
-      localStorage.setItem('wm_total_bets', this.totalBets);
       localStorage.setItem('wm_max_tables', this.maxTables);
       localStorage.setItem('wm_patterns', JSON.stringify(this.patterns));
     } catch (e) {}
@@ -243,10 +238,6 @@ class WMAutoHelper {
                 <option value="1000">Chip 1,000</option>
                 <option value="5000">Chip 5,000</option>
               </select>
-            </div>
-            <div class="wm-form-group">
-              <label class="wm-label">Số chip mỗi lần cược:</label>
-              <input type="number" class="wm-input" id="wm-total-bets" min="1" max="10" value="2">
             </div>
           </div>
           <div style="font-size:10px; color:#94a3b8; margin-top:8px;">Chọn nhanh chip (tự động click trên bàn game):</div>
@@ -433,13 +424,6 @@ class WMAutoHelper {
       });
     });
 
-    const totalBetsInput = document.getElementById('wm-total-bets');
-    totalBetsInput.addEventListener('change', (e) => {
-      this.totalBets = Math.max(1, parseInt(e.target.value) || 1);
-      this.saveSettings();
-      this.addLog(`Số lần cược: ${this.totalBets} (Tổng: ${this.totalBets * this.selectedChip})`, 'info');
-    });
-
     const maxTablesInput = document.getElementById('wm-max-tables');
     maxTablesInput.addEventListener('change', (e) => {
       this.maxTables = Math.max(1, parseInt(e.target.value) || 10);
@@ -520,9 +504,6 @@ class WMAutoHelper {
       const chipSelect = document.getElementById('wm-chip-select');
       if (chipSelect) chipSelect.value = String(this.selectedChip);
       this.updateQuickChipButtonsUI();
-
-      const totalBetsInput = document.getElementById('wm-total-bets');
-      if (totalBetsInput) totalBetsInput.value = String(this.totalBets);
 
       const maxTablesInput = document.getElementById('wm-max-tables');
       if (maxTablesInput) maxTablesInput.value = String(this.maxTables);
@@ -1604,9 +1585,9 @@ class WMAutoHelper {
     const betTarget = pattern.bet;
     const betTargetName = betTarget === 'B' ? 'Banker' : 'Player';
     const currentChip = this.actualGameChip || this.selectedChip;
-    const amount = currentChip * this.totalBets;
+    const amount = currentChip;
 
-    this.addLog(`Đang cược ${this.totalBets}x chip ${currentChip} vào ${betTargetName} (${table.name || table.id})...`, 'info');
+    this.addLog(`Đang cược chip ${currentChip} vào ${betTargetName} (${table.name || table.id})...`, 'info');
 
     let betSuccess = false;
 
@@ -1621,10 +1602,7 @@ class WMAutoHelper {
       const targetBtn = betTarget === 'B' ? table.bankerBtn : table.playerBtn;
 
       if (targetBtn) {
-        for (let i = 0; i < this.totalBets; i++) {
-          this.triggerFullClick(targetBtn);
-          await new Promise(r => setTimeout(r, 250));
-        }
+        this.triggerFullClick(targetBtn);
 
         // Bấm xác nhận cược nếu có nút confirm
         if (table.cardNode) {
@@ -1653,7 +1631,6 @@ class WMAutoHelper {
       tableId: table.id,
       bet: betTarget,
       chip: currentChip,
-      totalBets: this.totalBets,
       amount: amount,
       pattern: `${pattern.condition}=${pattern.bet}`,
       success: betSuccess,
@@ -1850,7 +1827,7 @@ class WMAutoHelper {
           <td>${item.time}</td>
           <td><b>${item.table}</b></td>
           <td>${betBadge}</td>
-          <td><b>${item.amount}</b> (${item.totalBets}x${item.chip})</td>
+          <td><b>${item.amount}</b></td>
           <td><code style="color:#00ff88;">${item.pattern}</code></td>
           <td>${resultHtml}</td>
           <td>${profitHtml}</td>
