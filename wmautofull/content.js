@@ -334,24 +334,28 @@ class WMAutoHelper {
               <div class="wm-ai-stat-lbl">Độ chính xác</div>
             </div>
             <div class="wm-ai-stat-box">
-              <div class="wm-ai-stat-val" id="wm-ai-pending" style="color:#38bdf8;">0</div>
-              <div class="wm-ai-stat-lbl">Đang chờ kết quả</div>
+              <div class="wm-ai-stat-val" id="wm-ai-net-profit" style="color:#38bdf8;">+0.0u</div>
+              <div class="wm-ai-stat-lbl">Lãi ròng (EV Net)</div>
             </div>
           </div>
 
-          <!-- Trạng thái học -->
+          <!-- Trạng thái học & Kiểm soát rủi ro -->
           <div class="wm-ai-learning-status">
             <div class="wm-ai-status-row">
               <span class="lbl">🧬 Mẫu cầu đã tích lũy:</span>
               <span class="val" id="wm-ai-patterns">0 mẫu (N-gram & Nhịp cầu)</span>
             </div>
             <div class="wm-ai-status-row">
-              <span class="lbl">🏆 Mô hình dẫn đầu:</span>
-              <span class="val" id="wm-ai-top-model">Markov N-gram (Order 3)</span>
+              <span class="lbl">📊 Hiệu suất 20 ván gần nhất:</span>
+              <span class="val" id="wm-ai-rolling-acc">50.0% (Chuỗi thua: 0)</span>
             </div>
             <div class="wm-ai-status-row">
-              <span class="lbl">⚡ Trạng thái:</span>
-              <span class="val" style="color:#34d399;">Học trực tuyến liên tục (Online Adaptive)</span>
+              <span class="lbl">🛡️ Bộ lọc rủi ro:</span>
+              <span class="val" id="wm-ai-risk-status" style="color:#34d399;">Bình thường (Đủ điều kiện cược)</span>
+            </div>
+            <div class="wm-ai-status-row">
+              <span class="lbl">🏆 Mô hình dẫn đầu:</span>
+              <span class="val" id="wm-ai-top-model">Markov N-gram (Order 3)</span>
             </div>
           </div>
 
@@ -1857,10 +1861,9 @@ class WMAutoHelper {
     }
 
     // LỚP 4: KIỂM TRA CHẶT CHẼ THỜI GIAN ĐẶT CƯỢC (BETTING TIME):
-    // - Chỉ cược khi thời gian đếm ngược còn từ 5s đến 28s.
-    // - TUYỆT ĐỐI BỎ QUA khi betTime < 5s (sát giờ khóa cược, tránh bị trễ nhịp hoặc sàn từ chối).
-    // - TUYỆT ĐỐI BỎ QUA khi betTime === 0 (bàn đang lật bài / chia bài / chưa mở cược).
-    const isBetTimeValid = (typeof betTime === 'number' && betTime >= 5 && betTime <= 28);
+    // - Chỉ cược khi thời gian đếm ngược còn từ 6s đến 25s (tránh bị trễ nhịp hoặc sàn khóa cược).
+    // - TUYỆT ĐỐI BỎ QUA khi betTime < 6s hoặc betTime === 0 (bàn đang chia bài / chưa mở cược).
+    const isBetTimeValid = (typeof betTime === 'number' && betTime >= 6 && betTime <= 25);
     const canBet = isBetTimeValid && !state.betPlaced;
 
     if (canBet && this.aiEngine) {
@@ -1895,7 +1898,7 @@ class WMAutoHelper {
           // Thêm vào nhật ký Explainability trên dashboard
           this.addAIPredictionToLog(prediction);
 
-          // CHẾ ĐỘ REAL BET: Khóa bàn vào activeBettingTables để ngăn chặn tuyệt đối cược đúp
+          // CHẾ ĐỘ REAL BET: Cược đúng 1 unit chip (Flat betting, tuyệt đối không gấp thếp để gỡ)
           this.activeBettingTables.add(tableId);
           try {
             this.addLog(`⚡ [AI REAL BET] ${prediction.tableName} (Còn ${betTime}s) ➔ Cược ${sideName} (${confPercent}%) | ${prediction.rationale}`, 'success');
@@ -1904,13 +1907,16 @@ class WMAutoHelper {
             this.activeBettingTables.delete(tableId);
           }
         } else {
-          // CHẾ ĐỘ PAPER TRADING (MẶC ĐỊNH): Mô phỏng an toàn, tuyệt đối không đặt tiền thật!
+          // CHẾ ĐỘ PAPER TRADING HOẶC BỊ HẠ DO HIỆU SUẤT / BẢO VỆ RỦI RO:
           state.betPlaced = true;
           state.lastBetTimestamp = now;
           this.tableStates[tableId] = state;
           this.addAIPredictionToLog(prediction);
-          this.addLog(`🤖 [AI PAPER] ${prediction.tableName} (Còn ${betTime}s) ➔ Dự đoán ${sideName} (${confPercent}%) | ${prediction.rationale}`, 'info');
+          const reasonNotice = prediction.paperTradingReason || 'Mô phỏng Paper Trading';
+          this.addLog(`🤖 [AI PAPER] ${prediction.tableName} (Còn ${betTime}s) ➔ Dự đoán ${sideName} (${confPercent}%) | [${reasonNotice}] | ${prediction.rationale}`, 'info');
         }
+      } else if (prediction && prediction.predicted === 'PASS') {
+        // AI chủ động bỏ qua do không đủ điều kiện an toàn (không spam log)
       }
     }
 
@@ -2649,16 +2655,45 @@ class WMAutoHelper {
       accEl.style.color = (stats.accuracy >= 0.52) ? '#00ff88' : ((stats.accuracy >= 0.48) ? '#facc15' : '#ef4444');
     }
 
+    const profitEl = document.getElementById('wm-ai-net-profit');
+    if (profitEl) {
+      const net = stats.netUnitsWon !== undefined ? stats.netUnitsWon : 0;
+      const ev = stats.expectedValue !== undefined ? stats.expectedValue : 0;
+      const sign = net >= 0 ? `+${net.toFixed(1)}u` : `${net.toFixed(1)}u`;
+      profitEl.innerHTML = `${sign} <span style="font-size:9.5px; font-weight:normal; color:#94a3b8; display:block;">(EV: ${ev >= 0 ? '+' : ''}${ev.toFixed(3)})</span>`;
+      profitEl.style.color = net >= 0 ? '#10b981' : '#ef4444';
+    }
+
     const pendingEl = document.getElementById('wm-ai-pending');
     if (pendingEl) {
       const pendingCount = this.aiEngine ? this.aiEngine.pendingPredictions.size : 0;
       pendingEl.textContent = pendingCount;
     }
 
-    // 3. Mẫu cầu và mô hình dẫn đầu
+    // 3. Mẫu cầu, hiệu suất gần đây và mô hình dẫn đầu
     const patternsEl = document.getElementById('wm-ai-patterns');
     if (patternsEl) {
       patternsEl.textContent = `${stats.patternsLearnedCount || 0} mẫu (N-gram & Nhịp cầu)`;
+    }
+
+    const rollingEl = document.getElementById('wm-ai-rolling-acc');
+    if (rollingEl) {
+      const rAcc = stats.rollingAccuracy !== undefined ? (stats.rollingAccuracy * 100).toFixed(1) : '50.0';
+      const streak = stats.currentLossStreak || 0;
+      rollingEl.textContent = `${rAcc}% (Chuỗi thua: ${streak})`;
+      rollingEl.style.color = Number(rAcc) >= 55 ? '#10b981' : (Number(rAcc) >= 48 ? '#facc15' : '#ef4444');
+    }
+
+    const riskEl = document.getElementById('wm-ai-risk-status');
+    if (riskEl) {
+      const status = stats.riskGuardStatus || (this.aiEngine?.isUnderperforming ? 'UNDERPERFORMING' : 'NORMAL');
+      if (status === 'UNDERPERFORMING') {
+        riskEl.innerHTML = '<span style="color:#f59e0b; font-weight:600;">⚠️ Tự động hạ Paper (Hiệu suất giảm)</span>';
+      } else if (status === 'STOP_LOSS') {
+        riskEl.innerHTML = '<span style="color:#ef4444; font-weight:bold;">🛑 Stop-Loss (Chuỗi thua chạm ngưỡng)</span>';
+      } else {
+        riskEl.innerHTML = '<span style="color:#34d399; font-weight:600;">🟢 Bình thường (Đủ điều kiện cược)</span>';
+      }
     }
 
     const topModelEl = document.getElementById('wm-ai-top-model');

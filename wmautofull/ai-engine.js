@@ -143,7 +143,8 @@
       this.name = 'Mô hình Chuỗi Markov (N-gram)';
       this.ngramCounts = {}; // { 'BPB': { B: 12, P: 5 } }
       this.alpha = 0.5; // Laplace smoothing parameter
-      this.minSupport = 3; // Cần tối thiểu 3 mẫu tương tự để tính xác suất
+      // ĐIỀU KIỆN 1: Tối thiểu 8 mẫu tương tự trong quá khứ mới đủ độ tin cậy thống kê
+      this.minSupport = 8;
     }
 
     trainRound(history, outcome) {
@@ -164,36 +165,57 @@
 
     predict(history) {
       const bp = history.filter(x => x === 'B' || x === 'P');
-      if (bp.length === 0) return null;
+      if (bp.length < 2) return null;
 
-      // Ưu tiên n-gram dài nhất có đủ số mẫu hỗ trợ (backoff model)
+      let bestCandidate = null;
+
+      // Ưu tiên n-gram dài nhất có đủ số mẫu hỗ trợ và đạt độ tự tin (Hierarchical Backoff Model)
       for (let n = 4; n >= 1; n--) {
         if (bp.length >= n) {
           const ctx = bp.slice(-n).join('');
           const stats = this.ngramCounts[ctx];
           if (stats) {
             const total = stats.total || ((stats.B || 0) + (stats.P || 0));
+            // ĐIỀU KIỆN 1: Kiểm tra đủ số lượng quan sát tối thiểu
             if (total >= this.minSupport) {
               const probB = ((stats.B || 0) + this.alpha) / (total + 2 * this.alpha);
               const probP = 1 - probB;
               const diff = Math.abs(probB - 0.5);
 
-              return {
-                model: this.name,
-                order: n,
-                context: ctx,
-                support: total,
-                probB: probB,
-                probP: probP,
-                predicted: probB > 0.55 ? 'B' : (probP > 0.55 ? 'P' : 'PASS'),
-                confidence: diff * 2,
-                rationale: `Chuỗi [${ctx}] đã gặp ${total} lần trong quá khứ (${stats.B || 0} lần Banker, ${stats.P || 0} lần Player)`
-              };
+              // Nếu n-gram này đạt biên an toàn >= 58%: trả về ngay lập tức
+              if (probB >= 0.58 || probP >= 0.58) {
+                return {
+                  model: this.name,
+                  order: n,
+                  context: ctx,
+                  support: total,
+                  probB: probB,
+                  probP: probP,
+                  predicted: probB >= 0.58 ? 'B' : 'P',
+                  confidence: diff * 2,
+                  isSufficient: true,
+                  rationale: `Chuỗi [${ctx}] đã gặp ${total} lần trong quá khứ (${stats.B || 0} lần Banker, ${stats.P || 0} lần Player)`
+                };
+              } else if (!bestCandidate) {
+                // Lưu lại làm ứng viên nếu các n-gram bậc thấp hơn cũng không vượt ngưỡng
+                bestCandidate = {
+                  model: this.name,
+                  order: n,
+                  context: ctx,
+                  support: total,
+                  probB: probB,
+                  probP: probP,
+                  predicted: 'PASS',
+                  confidence: diff * 2,
+                  isSufficient: true,
+                  rationale: `Chuỗi [${ctx}] đã gặp ${total} lần (${stats.B || 0}B, ${stats.P || 0}P) nhưng xác suất quá sát 50%`
+                };
+              }
             }
           }
         }
       }
-      return null;
+      return bestCandidate;
     }
   }
 
@@ -206,6 +228,8 @@
       this.name = 'Mô hình Nhịp Cầu & Bệt (Streak/Chop)';
       this.streakStats = {}; // { 'B_3': { continue: 8, break: 4 } }
       this.pingPongStats = { continue: 0, break: 0 };
+      // ĐIỀU KIỆN 1: Tối thiểu 6 mẫu bệt tương tự mới đủ độ tin cậy
+      this.minSupport = 6;
     }
 
     trainRound(history, outcome) {
@@ -249,13 +273,17 @@
         const cont = stats.continue !== undefined ? stats.continue : (stats.continueCount || 0);
         const brk = stats.break !== undefined ? stats.break : (stats.breakCount || 0);
         const total = cont + brk;
-        if (total >= 3) {
+        // ĐIỀU KIỆN 1: Kiểm tra đủ số lượng quan sát bệt tối thiểu
+        if (total >= this.minSupport) {
           const probContinue = (cont + 0.5) / (total + 1);
           const probBreak = 1 - probContinue;
 
-          const predicted = probContinue > 0.55 ? current : (probBreak > 0.55 ? (current === 'B' ? 'P' : 'B') : 'PASS');
           const probB = current === 'B' ? probContinue : probBreak;
           const probP = current === 'P' ? probContinue : probBreak;
+
+          let predicted = 'PASS';
+          if (probB >= 0.58) predicted = 'B';
+          else if (probP >= 0.58) predicted = 'P';
 
           return {
             model: this.name,
@@ -266,6 +294,7 @@
             probP: probP,
             predicted: predicted,
             confidence: Math.abs(probContinue - 0.5) * 2,
+            isSufficient: true,
             rationale: `Bệt [${current}] dài ${streakLen} ván: lịch sử ${cont}/${total} lần đi tiếp, ${brk}/${total} lần bẻ`
           };
         }
@@ -282,6 +311,7 @@
     constructor() {
       this.name = 'Mô hình Cân Bằng Bàn (Shoe Dynamics)';
       this.tableShoeStats = {}; // { tableId: { B: 15, P: 18, T: 2, total: 35 } }
+      this.minSupport = 15; // Cần ít nhất 15 ván trong shoe bàn
     }
 
     trainRound(tableId, outcome) {
@@ -296,10 +326,10 @@
 
     predict(tableId, history) {
       const stats = this.tableShoeStats[tableId];
-      if (!stats || stats.total < 10) return null;
+      if (!stats || stats.total < this.minSupport) return null;
 
       const nonTie = stats.B + stats.P;
-      if (nonTie < 8) return null;
+      if (nonTie < 12) return null;
 
       // Đánh giá độ lệch thế bàn (Bàn đang thiên Banker hay Player)
       const ratioB = stats.B / nonTie;
@@ -310,8 +340,8 @@
       let probB = ratioB;
       let probP = ratioP;
 
-      // Nếu bàn thiên lệch rõ rệt (> 60% trên ít nhất 15 ván)
-      if (stats.total >= 15) {
+      // Nếu bàn thiên lệch rõ rệt (>= 60% trên ít nhất 18 ván)
+      if (stats.total >= 18) {
         if (ratioB >= 0.60) {
           predicted = 'B';
           confidence = (ratioB - 0.5) * 2;
@@ -329,6 +359,7 @@
         probP: probP,
         predicted: predicted,
         confidence: confidence,
+        isSufficient: stats.total >= this.minSupport,
         rationale: `Bàn ${tableId} có tỷ lệ tổng: ${stats.B}B - ${stats.P}P - ${stats.T}T (${Math.round(ratioB * 100)}% B)`
       };
     }
@@ -366,60 +397,126 @@
     }
 
     combine(predictions) {
-      // predictions: { markov: {...}, streak: {...}, table: {...} }
-      let totalWeight = 0;
-      let weightedB = 0;
-      let weightedP = 0;
-      const activeContributors = [];
+      // ==========================================================================
+      // ĐIỀU KIỆN 2: CÁC MÔ HÌNH CÓ ĐỒNG THUẬN & BIÊN AN TOÀN (CONSENSUS & MARGIN)
+      // ==========================================================================
+      const minConsensusMargin = 0.58; // Xác suất tối thiểu 58% mới đủ an toàn sau khi trừ phế
+
+      const validPredictions = [];
+      const activeBets = [];
 
       for (const [key, pred] of Object.entries(predictions)) {
-        if (!pred || pred.predicted === 'PASS' || !pred.probB) continue;
-        const w = (this.weights[key] || 1.0) * (pred.confidence || 0.5);
-        totalWeight += w;
-        weightedB += pred.probB * w;
-        weightedP += pred.probP * w;
-        activeContributors.push({
-          key,
-          model: pred.model,
-          weight: w,
-          predicted: pred.predicted,
-          rationale: pred.rationale,
-          support: pred.support
-        });
+        if (!pred) continue;
+        validPredictions.push({ key, ...pred });
+        if (pred.predicted === 'B' || pred.predicted === 'P') {
+          activeBets.push({ key, ...pred });
+        }
       }
 
-      if (totalWeight === 0 || activeContributors.length === 0) {
+      // Nếu không có mô hình nào đủ điều kiện hoặc tất cả đều PASS
+      if (activeBets.length === 0) {
         return {
           predicted: 'PASS',
           probB: 0.5,
           probP: 0.5,
           confidence: 0,
-          rationale: 'Chưa đủ dữ liệu hoặc các mô hình chưa đạt độ tin cậy cần thiết.',
-          contributors: []
+          rationale: 'Chưa đủ dữ liệu quan sát tối thiểu hoặc các mô hình con đều khuyến nghị PASS.',
+          contributors: [],
+          gatePassed: false,
+          gateReason: 'INSUFFICIENT_DATA'
         };
+      }
+
+      // 1. KIỂM TRA XUNG ĐỘT (DISCORD / CONFLICT CHECK):
+      // Nếu có mô hình bảo Banker và mô hình bảo Player -> XUNG ĐỘT -> BẮT BUỘC PASS!
+      const votesB = activeBets.filter(m => m.predicted === 'B');
+      const votesP = activeBets.filter(m => m.predicted === 'P');
+
+      if (votesB.length > 0 && votesP.length > 0) {
+        const strB = votesB.map(m => `${m.key}=B(${(m.probB * 100).toFixed(0)}%)`).join(', ');
+        const strP = votesP.map(m => `${m.key}=P(${(m.probP * 100).toFixed(0)}%)`).join(', ');
+        return {
+          predicted: 'PASS',
+          probB: 0.5,
+          probP: 0.5,
+          confidence: 0,
+          rationale: `Xung đột tín hiệu: [${strB}] đối đầu [${strP}]. AI chủ động bỏ qua để bảo vệ vốn.`,
+          contributors: activeBets,
+          gatePassed: false,
+          gateReason: 'MODEL_CONFLICT'
+        };
+      }
+
+      // Tất cả mô hình có ý kiến đều cùng chọn 1 hướng ('B' hoặc 'P')
+      const unanimousSide = votesB.length > 0 ? 'B' : 'P';
+
+      // 2. KIỂM TRA ĐỘ ĐỒNG THUẬN TỐI THIỂU (CONSENSUS REQUIREMENT):
+      // Nếu chỉ có đúng 1 mô hình ra tín hiệu:
+      if (activeBets.length === 1) {
+        const single = activeBets[0];
+        const singleProb = unanimousSide === 'B' ? single.probB : single.probP;
+        const singleSupport = single.support || 0;
+
+        // Cần mẫu dày (N >= 15) và xác suất mạnh (>= 62%) khi không có mô hình thứ 2 bảo chứng
+        if (singleSupport < 15 || singleProb < 0.62) {
+          return {
+            predicted: 'PASS',
+            probB: single.probB,
+            probP: single.probP,
+            confidence: single.confidence || 0,
+            rationale: `Thiếu đồng thuận: Chỉ có ${single.key} đề xuất (${unanimousSide} ${(singleProb * 100).toFixed(0)}%), mẫu N=${singleSupport} chưa đạt ngưỡng độc lập (cần N>=15 và P>=62%).`,
+            contributors: activeBets,
+            gatePassed: false,
+            gateReason: 'LACK_OF_CONSENSUS'
+          };
+        }
+      }
+
+      // 3. TÍNH XÁC SUẤT BÌNH QUÂN CÓ TRỌNG SỐ VÀ KIỂM TRA BIÊN LỢI THẾ (MARGIN CHECK)
+      let totalWeight = 0;
+      let weightedB = 0;
+      let weightedP = 0;
+
+      for (const pred of activeBets) {
+        const w = (this.weights[pred.key] || 1.0) * (pred.confidence || 0.5);
+        totalWeight += w;
+        weightedB += pred.probB * w;
+        weightedP += pred.probP * w;
       }
 
       const finalProbB = weightedB / totalWeight;
       const finalProbP = weightedP / totalWeight;
-      const diff = Math.abs(finalProbB - 0.5);
+      const chosenProb = unanimousSide === 'B' ? finalProbB : finalProbP;
 
-      // Ngưỡng ra quyết định: Xác suất tối thiểu 56% và tự tin > 15%
-      let decision = 'PASS';
-      if (finalProbB >= 0.56) decision = 'B';
-      else if (finalProbP >= 0.56) decision = 'P';
+      // Kiểm tra biên an toàn tối thiểu (tối thiểu 58%)
+      if (chosenProb < minConsensusMargin) {
+        return {
+          predicted: 'PASS',
+          probB: finalProbB,
+          probP: finalProbP,
+          confidence: Math.abs(chosenProb - 0.5) * 2,
+          rationale: `Biên an toàn quá mỏng: Xác suất ${unanimousSide} đạt ${(chosenProb * 100).toFixed(1)}% < ${Math.round(minConsensusMargin * 100)}% (chưa đủ bù phí nhà cái).`,
+          contributors: activeBets,
+          gatePassed: false,
+          gateReason: 'MARGIN_TOO_THIN'
+        };
+      }
 
-      // Sắp xếp mô hình đóng góp nhiều nhất
-      activeContributors.sort((a, b) => b.weight - a.weight);
-      const topModel = activeContributors[0];
+      // Sắp xếp mô hình đóng góp uy tín nhất
+      activeBets.sort((a, b) => (b.weight || 0) - (a.weight || 0));
+      const topModel = activeBets[0];
+      const consensusNames = activeBets.map(m => m.key).join(' + ');
 
       return {
-        predicted: decision,
+        predicted: unanimousSide,
         probB: finalProbB,
         probP: finalProbP,
-        confidence: Math.min(1.0, diff * 2.5),
-        rationale: topModel ? topModel.rationale : 'Đánh giá tổng hợp đa mô hình',
-        contributors: activeContributors,
-        topModelName: topModel ? topModel.model : 'Tổng hợp'
+        confidence: Math.min(1.0, (chosenProb - 0.5) * 2.5),
+        rationale: `[Đồng thuận ${consensusNames}] ${topModel ? topModel.rationale : ''} (Xác suất ${(chosenProb * 100).toFixed(1)}%)`,
+        contributors: activeBets,
+        topModelName: topModel ? topModel.model : 'Đồng thuận đa mô hình',
+        gatePassed: true,
+        gateReason: 'APPROVED'
       };
     }
   }
@@ -448,8 +545,25 @@
         accuracy: 0,
         baselineAccuracy: 0.50, // Mức cơ sở ngẫu nhiên (Baseline 50.0%)
         edgeOverBaseline: 0,    // Độ vượt trội so với mức cơ sở (Alpha/Edge)
-        patternsLearnedCount: 0
+        patternsLearnedCount: 0,
+        netUnitsWon: 0,         // Lợi nhuận ròng sau khi trừ 5% hoa hồng Banker
+        expectedValue: 0,       // EV kỳ vọng trung bình mỗi ván cược
+        totalPassCount: 0,      // Số ván AI đã chủ động bỏ qua an toàn (PASS)
+        rollingAccuracy: 0.50,  // Độ chính xác trên 20 ván gần nhất
+        currentLossStreak: 0,   // Chuỗi thua liên tiếp hiện tại
+        maxLossStreak: 0,       // Chuỗi thua kỷ lục trong phiên
+        riskGuardStatus: 'NORMAL' // 'NORMAL' | 'UNDERPERFORMING' | 'STOP_LOSS'
       };
+
+      // ĐIỀU KIỆN 3: Cửa sổ trượt theo dõi hiệu suất gần đây (Rolling Window 20 ván)
+      this.rollingWindow = [];
+      this.rollingWindowSize = 20;
+      this.currentLossStreak = 0;
+      this.maxLossStreak = 0;
+      this.netUnitsWon = 0;
+      this.totalPassCount = 0;
+      this.isUnderperforming = false;
+      this.underperformReason = '';
 
       // Bộ lọc chống học trùng ván đa luồng (Round Deduplication Cache)
       this.processedRounds = new Set();
@@ -569,12 +683,13 @@
 
     exportKnowledge() {
       return {
-        version: 1,
+        version: 2,
         exportedAt: new Date().toISOString(),
         weights: this.ensemble.weights,
         markovCounts: this.markov.ngramCounts,
         streakStats: this.streak.streakStats,
         tableShoeStats: this.tableLearner.tableShoeStats,
+        rollingWindow: this.rollingWindow.slice(-20),
         stats: {
           totalRoundsObserved: this.stats.totalRoundsObserved || 0,
           predictionsScored: this.stats.predictionsScored || 0,
@@ -584,7 +699,14 @@
           accuracy: this.stats.accuracy || 0,
           baselineAccuracy: this.stats.baselineAccuracy || 0.50,
           edgeOverBaseline: this.stats.edgeOverBaseline || 0,
-          patternsLearnedCount: Object.keys(this.markov.ngramCounts).length + Object.keys(this.streak.streakStats).length
+          patternsLearnedCount: Object.keys(this.markov.ngramCounts).length + Object.keys(this.streak.streakStats).length,
+          netUnitsWon: this.stats.netUnitsWon || 0,
+          expectedValue: this.stats.expectedValue || 0,
+          totalPassCount: this.stats.totalPassCount || 0,
+          rollingAccuracy: this.stats.rollingAccuracy || 0.50,
+          currentLossStreak: this.stats.currentLossStreak || 0,
+          maxLossStreak: this.stats.maxLossStreak || 0,
+          riskGuardStatus: this.isUnderperforming ? 'UNDERPERFORMING' : 'NORMAL'
         }
       };
     }
@@ -595,8 +717,19 @@
       if (data.markovCounts) this.markov.ngramCounts = Object.assign(this.markov.ngramCounts, data.markovCounts);
       if (data.streakStats) this.streak.streakStats = Object.assign(this.streak.streakStats, data.streakStats);
       if (data.tableShoeStats) this.tableLearner.tableShoeStats = Object.assign(this.tableLearner.tableShoeStats, data.tableShoeStats);
+      if (data.rollingWindow && Array.isArray(data.rollingWindow)) {
+        this.rollingWindow = data.rollingWindow.slice(-20);
+      }
       if (data.stats) {
         this.stats = Object.assign(this.stats, data.stats);
+        this.netUnitsWon = this.stats.netUnitsWon || 0;
+        this.totalPassCount = this.stats.totalPassCount || 0;
+        this.currentLossStreak = this.stats.currentLossStreak || 0;
+        this.maxLossStreak = this.stats.maxLossStreak || 0;
+        if (this.stats.riskGuardStatus === 'UNDERPERFORMING') {
+          this.isUnderperforming = true;
+          this.underperformReason = 'Khôi phục từ phiên trước: Hiệu suất gần đây yếu';
+        }
       }
       this.notifyStats();
       return true;
@@ -614,11 +747,12 @@
 
     async persistKnowledge() {
       const payload = {
-        version: 1,
+        version: 2,
         weights: this.ensemble.weights,
         markovCounts: this.markov.ngramCounts,
         streakStats: this.streak.streakStats,
         tableShoeStats: this.tableLearner.tableShoeStats,
+        rollingWindow: this.rollingWindow.slice(-20),
         stats: this.stats,
         updatedAt: new Date().toISOString()
       };
@@ -693,32 +827,84 @@
 
       this.stats.totalRoundsObserved++;
 
-      // 2. KIỂM THỬ KHẢ NĂNG DỰ ĐOÁN NGOÀI MẪU (OUT-OF-SAMPLE EVALUATION):
+      // 2. KIỂM THỬ KHẢ NĂNG DỰ ĐOÁN NGOÀI MẪU & CHẤM ĐIỂM BACCARAT (NET PROFIT & EV):
       // Đánh giá dự đoán đã lưu TRƯỚC KHI cho các mô hình học kết quả ván mới này
       const pending = this.pendingPredictions.get(tableId);
       if (pending && pending.status === 'PENDING') {
         this.pendingPredictions.delete(tableId);
 
         let resultStatus = 'LOSS';
+        let roundUnitProfit = 0;
+
         if (newOutcome === 'T') {
-          // Quy tắc hòa Baccarat: Hoàn tiền, không tính là thua
+          // Baccarat TIE: Hoàn vốn, không tính là thắng hay thua
           resultStatus = 'TIE_PUSH';
+          roundUnitProfit = 0;
           this.stats.tiesPush++;
         } else if (pending.predicted === newOutcome) {
           resultStatus = 'WIN';
           this.stats.wins++;
+          this.currentLossStreak = 0; // Đứt chuỗi thua
+          // Tỷ lệ trả thưởng chuẩn Baccarat: Banker ăn 1:0.95 (trừ 5% hoa hồng), Player ăn 1:1
+          roundUnitProfit = (newOutcome === 'B') ? 0.95 : 1.00;
         } else if (pending.predicted !== 'PASS') {
           resultStatus = 'LOSS';
           this.stats.losses++;
+          this.currentLossStreak++;
+          if (this.currentLossStreak > this.maxLossStreak) {
+            this.maxLossStreak = this.currentLossStreak;
+          }
+          roundUnitProfit = -1.00;
         }
 
         if (pending.predicted !== 'PASS' && newOutcome !== 'T') {
           this.stats.predictionsScored++;
           const scoredCount = this.stats.wins + this.stats.losses;
           this.stats.accuracy = scoredCount > 0 ? (this.stats.wins / scoredCount) : 0;
-          // Tính hiệu quả vượt trội so với mức cơ sở ngẫu nhiên (Baseline 50.0%)
           this.stats.baselineAccuracy = 0.50;
           this.stats.edgeOverBaseline = this.stats.accuracy - this.stats.baselineAccuracy;
+
+          // Cập nhật lợi nhuận ròng có tính phí hoa hồng 5% của Banker
+          this.netUnitsWon += roundUnitProfit;
+          this.stats.netUnitsWon = Number(this.netUnitsWon.toFixed(2));
+          this.stats.expectedValue = Number((this.netUnitsWon / scoredCount).toFixed(3));
+
+          // Ghi nhận vào Rolling Window (20 ván gần nhất)
+          this.rollingWindow.push({
+            isWin: resultStatus === 'WIN',
+            side: pending.predicted,
+            outcome: newOutcome,
+            profit: roundUnitProfit,
+            timestamp: Date.now()
+          });
+          if (this.rollingWindow.length > this.rollingWindowSize) {
+            this.rollingWindow.shift();
+          }
+
+          // Tính toán Rolling Metrics
+          const winInWindow = this.rollingWindow.filter(r => r.isWin).length;
+          const rollingAcc = this.rollingWindow.length > 0 ? (winInWindow / this.rollingWindow.length) : 0.5;
+          this.stats.rollingAccuracy = Number(rollingAcc.toFixed(3));
+          this.stats.currentLossStreak = this.currentLossStreak;
+          this.stats.maxLossStreak = this.maxLossStreak;
+
+          // ĐIỀU KIỆN 3: KIỂM TRA HIỆU SUẤT GẦN ĐÂY
+          // Nếu đã có từ 8 ván trong cửa sổ và:
+          // 1. Tỷ lệ thắng cửa sổ < 48% (hiệu suất rơi xuống dưới mức nền), HOẶC
+          // 2. Chuỗi thua liên tiếp >= 3 ván:
+          // -> TỰ ĐỘNG HẠ XUỐNG DYNAMIC PAPER TRADING
+          if (this.rollingWindow.length >= 8) {
+            if (rollingAcc < 0.48 || this.currentLossStreak >= 3) {
+              this.isUnderperforming = true;
+              this.underperformReason = `Hiệu suất 20 ván gần nhất sụt giảm (${(rollingAcc * 100).toFixed(0)}%) hoặc chuỗi thua ${this.currentLossStreak} ván`;
+              this.stats.riskGuardStatus = 'UNDERPERFORMING';
+            } else if (rollingAcc >= 0.55 && this.currentLossStreak === 0) {
+              // Hồi phục: Rolling Acc >= 55% và không còn trong chuỗi thua
+              this.isUnderperforming = false;
+              this.underperformReason = '';
+              this.stats.riskGuardStatus = 'NORMAL';
+            }
+          }
         }
 
         // Cập nhật trọng số thích ứng cho từng mô hình con (Online Adaptive Weighting)
@@ -735,6 +921,7 @@
         // Lưu vào sổ dự đoán IndexedDB
         pending.status = resultStatus;
         pending.actualOutcome = newOutcome;
+        pending.profit = roundUnitProfit;
         pending.resolvedAt = Date.now();
         this.db.savePrediction(pending);
       }
@@ -765,16 +952,21 @@
 
     /**
      * VÒNG HỌC 2: TẠO DỰ ĐOÁN CHO VÁN TIẾP THEO (PRE-ROUND PREDICTION)
-     * Sinh dự đoán trước khi biết kết quả, lưu vào sổ và trả về đề xuất cược.
+     * Áp dụng Luồng Quyết Định Mới 4 Điều Kiện Chọn Lọc.
      */
     generatePrediction(tableId, tableName, history) {
-      if (!history || history.length < 2) {
+      // ĐIỀU KIỆN 1: KIỂM TRA ĐỦ DỮ LIỆU BÀN
+      if (!history || history.length < 4) {
         return {
+          tableId: tableId,
+          tableName: tableName,
           shouldBet: false,
           predicted: 'PASS',
           confidence: 0,
-          rationale: 'Chưa đủ dữ liệu ván ban đầu (cần >= 2 ván)',
-          tradingMode: this.tradingMode
+          rationale: 'Chưa đủ dữ liệu ván ban đầu (cần >= 4 ván)',
+          tradingMode: this.tradingMode,
+          gatePassed: false,
+          gateReason: 'INSUFFICIENT_HISTORY'
         };
       }
 
@@ -783,12 +975,17 @@
       const subStreak = this.streak.predict(history);
       const subTable = this.tableLearner.predict(tableId, history);
 
-      // 2. Kết hợp đa mô hình có trọng số
+      // 2. ĐIỀU KIỆN 2: ĐÁNH GIÁ ĐỒNG THUẬN & BIÊN AN TOÀN QUA ENSEMBLE GATING
       const combined = this.ensemble.combine({
         markov: subMarkov,
         streak: subStreak,
         table: subTable
       });
+
+      if (combined.predicted === 'PASS') {
+        this.totalPassCount++;
+        this.stats.totalPassCount = this.totalPassCount;
+      }
 
       const predictionRecord = {
         id: `pred_${Date.now()}_${tableId}`,
@@ -800,6 +997,8 @@
         confidence: combined.confidence,
         rationale: combined.rationale,
         topModelName: combined.topModelName,
+        gatePassed: combined.gatePassed,
+        gateReason: combined.gateReason,
         subPredictions: {
           markov: subMarkov,
           streak: subStreak,
@@ -812,27 +1011,50 @@
         sessionId: this.sessionId
       };
 
-      // 3. Ghi vào Sổ dự đoán đang chờ
+      // 3. Ghi vào Sổ dự đoán đang chờ (chỉ ghi nhận khi vượt qua chọn lọc)
       if (combined.predicted !== 'PASS') {
         this.pendingPredictions.set(tableId, predictionRecord);
         this.db.savePrediction(predictionRecord);
       }
 
-      // Chốt an toàn: Chỉ cho phép cược thật nếu người dùng bật REAL
-      const isConfident = combined.predicted === 'B' || combined.predicted === 'P';
-      const allowRealExecution = isConfident && (this.tradingMode === 'REAL');
+      // ĐIỀU KIỆN 3 & 4: KIỂM TRA HIỆU SUẤT GẦN ĐÂY & KIỂM SOÁT RỦI RO
+      const isConfident = (combined.predicted === 'B' || combined.predicted === 'P');
+      let allowRealExecution = false;
+      let paperReason = '';
+
+      if (!isConfident) {
+        allowRealExecution = false;
+        paperReason = combined.rationale;
+      } else if (this.tradingMode !== 'REAL') {
+        allowRealExecution = false;
+        paperReason = 'Đang ở chế độ Paper Trading (Mô phỏng an toàn)';
+      } else if (this.isUnderperforming) {
+        // ĐIỀU KIỆN 3: Hiệu suất 20 ván gần đây sụt giảm
+        allowRealExecution = false;
+        paperReason = `Hạ mức cược: ${this.underperformReason}`;
+      } else if (this.currentLossStreak >= 4) {
+        // ĐIỀU KIỆN 4: Chạm giới hạn chuỗi thua liên tiếp (Stop-Loss)
+        allowRealExecution = false;
+        paperReason = `Kích hoạt Stop-Loss: Chuỗi thua chạm mốc ${this.currentLossStreak} ván`;
+      } else {
+        // VƯỢT QUA TOÀN BỘ 4 ĐIỀU KIỆN: ĐỦ TIÊU CHUẨN CƯỢC THẬT!
+        allowRealExecution = true;
+      }
 
       return {
         tableId: tableId,
         tableName: tableName,
         predicted: combined.predicted,
         shouldBet: allowRealExecution,
-        isPaperTrading: this.tradingMode === 'PAPER',
+        isPaperTrading: !allowRealExecution,
+        paperTradingReason: paperReason,
         probB: combined.probB,
         probP: combined.probP,
         confidence: combined.confidence,
         rationale: combined.rationale,
         topModelName: combined.topModelName,
+        gatePassed: combined.gatePassed,
+        gateReason: combined.gateReason,
         predictionRecord: predictionRecord
       };
     }

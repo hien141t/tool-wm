@@ -60,8 +60,8 @@ async function runTests() {
   console.log('--- TEST 2: DỰ ĐOÁN TRƯỚC VÁN, CHẤM ĐIỂM NGOÀI MẪU & SO VỚI BASELINE ---');
   const targetPattern = ['P', 'P', 'P', 'P'];
   // Huấn luyện mẫu cầu bẻ bệt P -> B (cả Markov và Streak đều đồng thuận B)
-  for (let i = 0; i < 20; i++) {
-    engine.onRoundCompleted(`train_tbl_${i}_${Date.now()}`, 'Baccarat 1', targetPattern, 'B');
+  for (let i = 0; i < 25; i++) {
+    engine.onRoundCompleted(`train_tbl_${i}_${Date.now()}_${Math.random()}`, 'Baccarat 1', targetPattern, 'B');
   }
 
   const currentHistory = targetPattern; // Chuỗi PPPP -> Cả 2 mô hình đều đồng thuận Banker (B)
