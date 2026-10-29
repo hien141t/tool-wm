@@ -2,201 +2,201 @@
   "version": 2,
   "weights": {
     "markov": 1.0904077904796878,
-    "streak": 0.5859784685200274,
-    "table": 0.7378550595836382
+    "streak": 0.49597217575535124,
+    "table": 0.7440786734826876
   },
   "markovCounts": {
     "P": {
-      "B": 1437,
-      "P": 1422,
-      "total": 2859
+      "B": 1497,
+      "P": 1474,
+      "total": 2971
     },
     "PP": {
-      "B": 664,
-      "P": 665,
-      "total": 1329
+      "B": 695,
+      "P": 682,
+      "total": 1377
     },
     "BPP": {
-      "B": 324,
-      "P": 333,
-      "total": 657
+      "B": 342,
+      "P": 342,
+      "total": 684
     },
     "BBPP": {
-      "B": 150,
-      "P": 143,
-      "total": 293
+      "B": 158,
+      "P": 148,
+      "total": 306
     },
     "PPP": {
-      "B": 304,
-      "P": 302,
-      "total": 606
+      "B": 316,
+      "P": 307,
+      "total": 623
     },
     "BPPP": {
-      "B": 150,
-      "P": 150,
-      "total": 300
+      "B": 157,
+      "P": 154,
+      "total": 311
     },
     "BP": {
-      "B": 707,
-      "P": 698,
-      "total": 1405
+      "B": 734,
+      "P": 728,
+      "total": 1462
     },
     "BBP": {
-      "B": 344,
-      "P": 319,
-      "total": 663
+      "B": 358,
+      "P": 335,
+      "total": 693
     },
     "BBBP": {
-      "B": 176,
-      "P": 155,
-      "total": 331
+      "B": 184,
+      "P": 165,
+      "total": 349
     },
     "B": {
-      "B": 1548,
-      "P": 1443,
-      "total": 2991
+      "B": 1633,
+      "P": 1503,
+      "total": 3136
     },
     "BB": {
-      "B": 770,
-      "P": 693,
-      "total": 1463
+      "B": 816,
+      "P": 724,
+      "total": 1540
     },
     "BBB": {
-      "B": 381,
-      "P": 345,
-      "total": 726
+      "B": 405,
+      "P": 362,
+      "total": 767
     },
     "BBBB": {
-      "B": 199,
-      "P": 158,
-      "total": 357
+      "B": 214,
+      "P": 166,
+      "total": 380
     },
     "PB": {
-      "B": 714,
-      "P": 689,
-      "total": 1403
+      "B": 748,
+      "P": 717,
+      "total": 1465
     },
     "BPB": {
-      "B": 340,
-      "P": 352,
-      "total": 692
+      "B": 354,
+      "P": 364,
+      "total": 718
     },
     "BBPB": {
-      "B": 160,
-      "P": 174,
-      "total": 334
-    },
-    "PPB": {
-      "B": 336,
-      "P": 309,
-      "total": 645
-    },
-    "PPPB": {
-      "B": 158,
-      "P": 143,
-      "total": 301
-    },
-    "PBP": {
-      "B": 333,
-      "P": 341,
-      "total": 674
-    },
-    "BPBP": {
-      "B": 164,
-      "P": 184,
+      "B": 166,
+      "P": 182,
       "total": 348
     },
-    "PBPB": {
-      "B": 163,
-      "P": 163,
-      "total": 326
+    "PPB": {
+      "B": 354,
+      "P": 325,
+      "total": 679
     },
-    "PBB": {
-      "B": 360,
-      "P": 308,
-      "total": 668
-    },
-    "PPBB": {
-      "B": 176,
-      "P": 137,
+    "PPPB": {
+      "B": 164,
+      "P": 149,
       "total": 313
     },
+    "PBP": {
+      "B": 345,
+      "P": 355,
+      "total": 700
+    },
+    "BPBP": {
+      "B": 171,
+      "P": 190,
+      "total": 361
+    },
+    "PBPB": {
+      "B": 170,
+      "P": 167,
+      "total": 337
+    },
+    "PBB": {
+      "B": 379,
+      "P": 321,
+      "total": 700
+    },
+    "PPBB": {
+      "B": 186,
+      "P": 143,
+      "total": 329
+    },
     "PPBP": {
-      "B": 157,
-      "P": 140,
-      "total": 297
+      "B": 162,
+      "P": 148,
+      "total": 310
     },
     "PBPP": {
-      "B": 153,
-      "P": 171,
-      "total": 324
+      "B": 162,
+      "P": 175,
+      "total": 337
     },
     "PBBB": {
-      "B": 168,
-      "P": 171,
-      "total": 339
+      "B": 175,
+      "P": 179,
+      "total": 354
     },
     "BPPB": {
-      "B": 165,
-      "P": 142,
-      "total": 307
+      "B": 175,
+      "P": 152,
+      "total": 327
     },
     "PBBP": {
-      "B": 147,
-      "P": 144,
-      "total": 291
+      "B": 152,
+      "P": 150,
+      "total": 302
     },
     "BPBB": {
-      "B": 161,
-      "P": 155,
-      "total": 316
+      "B": 168,
+      "P": 162,
+      "total": 330
     },
     "PPPP": {
-      "B": 138,
-      "P": 138,
-      "total": 276
+      "B": 141,
+      "P": 139,
+      "total": 280
     }
   },
   "streakStats": {
     "P_2": {
-      "continue": 363,
-      "break": 360
+      "continue": 375,
+      "break": 379
     },
     "P_3": {
-      "continue": 164,
-      "break": 166
+      "continue": 168,
+      "break": 175
     },
     "P_1": {
-      "continue": 698,
-      "break": 707
+      "continue": 728,
+      "break": 734
     },
     "B_8": {
-      "continue": 4,
-      "break": 4
+      "continue": 5,
+      "break": 5
     },
     "B_1": {
-      "continue": 714,
-      "break": 689
+      "continue": 748,
+      "break": 717
     },
     "B_2": {
-      "continue": 389,
-      "break": 348
+      "continue": 411,
+      "break": 362
     },
     "B_3": {
-      "continue": 182,
-      "break": 187
+      "continue": 191,
+      "break": 196
     },
     "P_4": {
       "continue": 75,
-      "break": 74
+      "break": 76
     },
     "B_4": {
-      "continue": 65,
-      "break": 103
+      "continue": 70,
+      "break": 106
     },
     "P_5": {
-      "continue": 38,
-      "break": 34
+      "continue": 39,
+      "break": 35
     },
     "P_6": {
       "continue": 18,
@@ -207,15 +207,15 @@
       "break": 11
     },
     "B_5": {
-      "continue": 35,
-      "break": 28
+      "continue": 39,
+      "break": 29
     },
     "B_6": {
-      "continue": 20,
-      "break": 13
+      "continue": 22,
+      "break": 16
     },
     "B_7": {
-      "continue": 7,
+      "continue": 9,
       "break": 10
     },
     "B_21": {
@@ -227,7 +227,7 @@
       "break": 0
     },
     "B_9": {
-      "continue": 4,
+      "continue": 5,
       "break": 0
     },
     "B_10": {
@@ -499,16 +499,16 @@
       "total": 63
     },
     "groupMultiple_101_1355:1": {
-      "B": 8,
-      "P": 9,
-      "T": 6,
-      "total": 23
+      "B": 12,
+      "P": 13,
+      "T": 8,
+      "total": 33
     },
     "groupMultiple_101_507:1": {
       "B": 11,
-      "P": 22,
+      "P": 24,
       "T": 3,
-      "total": 36
+      "total": 38
     },
     "groupMultiple_101_1357:1": {
       "B": 15,
@@ -523,46 +523,46 @@
       "total": 36
     },
     "groupMultiple_101_933:1": {
-      "B": 14,
+      "B": 15,
       "P": 10,
       "T": 3,
-      "total": 27
+      "total": 28
     },
     "groupMultiple_101_505:1": {
-      "B": 11,
-      "P": 12,
+      "B": 13,
+      "P": 13,
       "T": 5,
-      "total": 28
+      "total": 31
     },
     "groupMultiple_102_1392:1": {
       "B": 0,
       "P": 0,
-      "T": 3,
-      "total": 3
+      "T": 4,
+      "total": 4
     },
     "groupMultiple_101_931:1": {
-      "B": 4,
-      "P": 7,
+      "B": 13,
+      "P": 10,
       "T": 1,
-      "total": 12
+      "total": 24
     },
     "groupMultiple_101_935:1": {
-      "B": 10,
-      "P": 11,
-      "T": 0,
-      "total": 21
+      "B": 22,
+      "P": 16,
+      "T": 2,
+      "total": 40
     },
     "groupMultiple_101_503:1": {
-      "B": 16,
-      "P": 19,
+      "B": 19,
+      "P": 21,
       "T": 3,
-      "total": 38
+      "total": 43
     },
     "groupMultiple_101_1365:1": {
-      "B": 7,
-      "P": 13,
-      "T": 4,
-      "total": 24
+      "B": 10,
+      "P": 15,
+      "T": 5,
+      "total": 30
     },
     "groupMultiple_101_938:1": {
       "B": 7,
@@ -579,8 +579,8 @@
     "groupMultiple_108_7:1": {
       "B": 0,
       "P": 0,
-      "T": 8,
-      "total": 8
+      "T": 11,
+      "total": 11
     },
     "groupMultiple_101_501:1": {
       "B": 12,
@@ -595,28 +595,28 @@
       "total": 47
     },
     "groupMultiple_101_1361:1": {
-      "B": 18,
-      "P": 17,
-      "T": 7,
-      "total": 42
+      "B": 20,
+      "P": 18,
+      "T": 8,
+      "total": 46
     },
     "groupMultiple_101_508:1": {
-      "B": 18,
-      "P": 15,
+      "B": 24,
+      "P": 19,
       "T": 2,
-      "total": 35
+      "total": 45
     },
     "groupMultiple_107_2:1": {
-      "B": 11,
-      "P": 6,
+      "B": 12,
+      "P": 8,
       "T": 0,
-      "total": 17
+      "total": 20
     },
     "groupMultiple_101_1353:1": {
-      "B": 13,
-      "P": 11,
-      "T": 3,
-      "total": 27
+      "B": 23,
+      "P": 19,
+      "T": 5,
+      "total": 47
     },
     "groupMultiple_101_939:1": {
       "B": 13,
@@ -627,80 +627,80 @@
     "groupMultiple_108_6:1": {
       "B": 0,
       "P": 0,
-      "T": 10,
-      "total": 10
+      "T": 13,
+      "total": 13
     },
     "groupMultiple_102_540:1": {
       "B": 0,
       "P": 0,
-      "T": 5,
-      "total": 5
+      "T": 6,
+      "total": 6
     },
     "groupMultiple_101_531:1": {
-      "B": 11,
-      "P": 8,
+      "B": 13,
+      "P": 13,
       "T": 1,
-      "total": 20
+      "total": 27
     },
     "groupMultiple_108_7:2": {
       "B": 0,
       "P": 0,
-      "T": 4,
-      "total": 4
+      "T": 6,
+      "total": 6
     },
     "groupMultiple_101_1363:1": {
-      "B": 10,
-      "P": 7,
-      "T": 4,
-      "total": 21
+      "B": 25,
+      "P": 14,
+      "T": 5,
+      "total": 44
     },
     "groupMultiple_101_1352:1": {
-      "B": 10,
-      "P": 8,
-      "T": 2,
-      "total": 20
+      "B": 18,
+      "P": 20,
+      "T": 5,
+      "total": 43
     },
     "groupMultiple_101_1351:1": {
-      "B": 12,
-      "P": 8,
-      "T": 1,
-      "total": 21
+      "B": 24,
+      "P": 17,
+      "T": 3,
+      "total": 44
     },
     "groupMultiple_101_1360:1": {
-      "B": 7,
-      "P": 10,
-      "T": 3,
-      "total": 20
+      "B": 15,
+      "P": 14,
+      "T": 6,
+      "total": 35
     },
     "groupMultiple_101_534:1": {
-      "B": 9,
-      "P": 11,
-      "T": 4,
-      "total": 24
+      "B": 16,
+      "P": 21,
+      "T": 5,
+      "total": 42
     },
     "groupMultiple_101_533:1": {
-      "B": 5,
-      "P": 14,
-      "T": 1,
-      "total": 20
+      "B": 18,
+      "P": 21,
+      "T": 3,
+      "total": 42
     },
     "groupMultiple_101_1356:1": {
-      "B": 8,
-      "P": 11,
-      "T": 1,
-      "total": 20
+      "B": 19,
+      "P": 19,
+      "T": 3,
+      "total": 41
     },
     "groupMultiple_101_530:1": {
-      "B": 13,
-      "P": 6,
-      "T": 2,
-      "total": 21
+      "B": 21,
+      "P": 19,
+      "T": 3,
+      "total": 43
     },
     "groupMultiple_101_502:1": {
-      "B": 9,
+      "B": 10,
       "P": 10,
-      "T": 1,
-      "total": 20
+      "T": 2,
+      "total": 22
     },
     "groupMultiple_101_502": {
       "B": 1,
@@ -721,16 +721,28 @@
       "total": 24
     },
     "groupMultiple_101_937:1": {
-      "B": 8,
-      "P": 6,
-      "T": 4,
-      "total": 18
+      "B": 10,
+      "P": 9,
+      "T": 5,
+      "total": 24
     },
     "groupMultiple_107_2:2": {
-      "B": 0,
-      "P": 3,
+      "B": 2,
+      "P": 4,
       "T": 0,
-      "total": 3
+      "total": 6
+    },
+    "groupMultiple_103_542:1": {
+      "B": 4,
+      "P": 0,
+      "T": 0,
+      "total": 4
+    },
+    "groupMultiple_108_7:3": {
+      "B": 0,
+      "P": 0,
+      "T": 1,
+      "total": 1
     }
   },
   "rollingWindow": [
@@ -739,164 +751,164 @@
       "side": "B",
       "outcome": "B",
       "profit": 0.95,
-      "timestamp": 1793291617755
+      "timestamp": 1793293315713
+    },
+    {
+      "isWin": false,
+      "side": "P",
+      "outcome": "B",
+      "profit": -1,
+      "timestamp": 1793293320505
     },
     {
       "isWin": false,
       "side": "B",
       "outcome": "P",
       "profit": -1,
-      "timestamp": 1793291698452
-    },
-    {
-      "isWin": true,
-      "side": "P",
-      "outcome": "P",
-      "profit": 1,
-      "timestamp": 1793291699662
-    },
-    {
-      "isWin": true,
-      "side": "P",
-      "outcome": "P",
-      "profit": 1,
-      "timestamp": 1793291739253
-    },
-    {
-      "isWin": true,
-      "side": "P",
-      "outcome": "P",
-      "profit": 1,
-      "timestamp": 1793291742868
-    },
-    {
-      "isWin": false,
-      "side": "P",
-      "outcome": "B",
-      "profit": -1,
-      "timestamp": 1793291819645
-    },
-    {
-      "isWin": false,
-      "side": "P",
-      "outcome": "B",
-      "profit": -1,
-      "timestamp": 1793291823255
-    },
-    {
-      "isWin": true,
-      "side": "P",
-      "outcome": "P",
-      "profit": 1,
-      "timestamp": 1793291865244
-    },
-    {
-      "isWin": true,
-      "side": "P",
-      "outcome": "P",
-      "profit": 1,
-      "timestamp": 1793291907259
-    },
-    {
-      "isWin": true,
-      "side": "P",
-      "outcome": "P",
-      "profit": 1,
-      "timestamp": 1793291908458
-    },
-    {
-      "isWin": false,
-      "side": "P",
-      "outcome": "B",
-      "profit": -1,
-      "timestamp": 1793291910851
-    },
-    {
-      "isWin": true,
-      "side": "P",
-      "outcome": "P",
-      "profit": 1,
-      "timestamp": 1793291959835
+      "timestamp": 1793293334897
     },
     {
       "isWin": false,
       "side": "B",
       "outcome": "P",
       "profit": -1,
-      "timestamp": 1793292078052
+      "timestamp": 1793293358924
     },
     {
       "isWin": false,
       "side": "P",
       "outcome": "B",
       "profit": -1,
-      "timestamp": 1793292078066
-    },
-    {
-      "isWin": false,
-      "side": "P",
-      "outcome": "B",
-      "profit": -1,
-      "timestamp": 1793292129247
+      "timestamp": 1793293362497
     },
     {
       "isWin": true,
-      "side": "P",
-      "outcome": "P",
-      "profit": 1,
-      "timestamp": 1793292314049
-    },
-    {
-      "isWin": true,
-      "side": "P",
-      "outcome": "P",
-      "profit": 1,
-      "timestamp": 1793292406450
+      "side": "B",
+      "outcome": "B",
+      "profit": 0.95,
+      "timestamp": 1793293405709
     },
     {
       "isWin": false,
       "side": "P",
       "outcome": "B",
       "profit": -1,
-      "timestamp": 1793292452053
-    },
-    {
-      "isWin": false,
-      "side": "P",
-      "outcome": "B",
-      "profit": -1,
-      "timestamp": 1793292497663
+      "timestamp": 1793293408104
     },
     {
       "isWin": false,
       "side": "B",
       "outcome": "P",
       "profit": -1,
-      "timestamp": 1793292663488
+      "timestamp": 1793293411705
+    },
+    {
+      "isWin": false,
+      "side": "B",
+      "outcome": "P",
+      "profit": -1,
+      "timestamp": 1793293415303
+    },
+    {
+      "isWin": false,
+      "side": "B",
+      "outcome": "P",
+      "profit": -1,
+      "timestamp": 1793293451308
+    },
+    {
+      "isWin": false,
+      "side": "P",
+      "outcome": "B",
+      "profit": -1,
+      "timestamp": 1793293453700
+    },
+    {
+      "isWin": true,
+      "side": "B",
+      "outcome": "B",
+      "profit": 0.95,
+      "timestamp": 1793293496901
+    },
+    {
+      "isWin": true,
+      "side": "B",
+      "outcome": "B",
+      "profit": 0.95,
+      "timestamp": 1793293538914
+    },
+    {
+      "isWin": false,
+      "side": "B",
+      "outcome": "P",
+      "profit": -1,
+      "timestamp": 1793293577300
+    },
+    {
+      "isWin": false,
+      "side": "B",
+      "outcome": "P",
+      "profit": -1,
+      "timestamp": 1793293624127
+    },
+    {
+      "isWin": false,
+      "side": "B",
+      "outcome": "P",
+      "profit": -1,
+      "timestamp": 1793293714101
+    },
+    {
+      "isWin": true,
+      "side": "B",
+      "outcome": "B",
+      "profit": 0.95,
+      "timestamp": 1793293745292
+    },
+    {
+      "isWin": true,
+      "side": "B",
+      "outcome": "B",
+      "profit": 0.95,
+      "timestamp": 1793293789694
+    },
+    {
+      "isWin": false,
+      "side": "B",
+      "outcome": "P",
+      "profit": -1,
+      "timestamp": 1793293807695
+    },
+    {
+      "isWin": true,
+      "side": "P",
+      "outcome": "P",
+      "profit": 1,
+      "timestamp": 1793293955289
     }
   ],
   "stats": {
-    "totalRoundsObserved": 6667,
-    "predictionsScored": 731,
-    "wins": 366,
-    "losses": 365,
-    "tiesPush": 75,
-    "accuracy": 0.5006839945280438,
+    "totalRoundsObserved": 6962,
+    "predictionsScored": 770,
+    "wins": 382,
+    "losses": 388,
+    "tiesPush": 76,
+    "accuracy": 0.4961038961038961,
     "baselineAccuracy": 0.5,
-    "edgeOverBaseline": 0.0006839945280437965,
+    "edgeOverBaseline": -0.0038961038961038974,
     "patternsLearnedCount": 62,
-    "netUnitsWon": 0.9,
-    "expectedValue": 0.001,
-    "totalPassCount": 228,
-    "rollingAccuracy": 0.5,
-    "currentLossStreak": 3,
-    "maxLossStreak": 3,
+    "netUnitsWon": -6.65,
+    "expectedValue": -0.009,
+    "totalPassCount": 394,
+    "rollingAccuracy": 0.35,
+    "currentLossStreak": 0,
+    "maxLossStreak": 5,
     "riskGuardStatus": "NORMAL",
     "filterMode": "MEDIUM",
     "filterModeLabel": "⚖️ Medium (≥5)"
   },
-  "updatedAt": "2026-10-29T16:52:47.918Z",
-  "revision": 413,
+  "updatedAt": "2026-10-29T17:13:13.687Z",
+  "revision": 637,
   "writerId": "bridge",
-  "savedAt": "2026-10-29T23:52:47.940266"
+  "savedAt": "2026-10-30T00:13:13.701677"
 }

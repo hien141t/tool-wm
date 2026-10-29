@@ -319,15 +319,13 @@ class WMAutoHelper {
             </div>
           </div>
 
-          <!-- Chế độ nhạy mô hình AI (Model Sensitivity Modes: Flash, Medium, Low, High, Ultra) -->
+          <!-- Chế độ nhạy mô hình AI: Flash (≥3), Low (≥6), High (≥8) -->
           <div class="wm-ai-mode-bar" style="margin-top: 6px; flex-wrap: wrap;">
             <span style="font-size:11px; color:#94a3b8; font-weight:600;">Độ nhạy AI:</span>
             <div class="wm-ai-filter-toggle">
-              <button type="button" class="wm-filter-btn" data-mode="FLASH" title="Flash: Đánh nhanh, mẫu xuất hiện ≥3 lần">⚡ Flash (≥3)</button>
-              <button type="button" class="wm-filter-btn" data-mode="MEDIUM" title="Medium: Cân bằng nhịp, mẫu ≥5 lần">⚖️ Med (≥5)</button>
-              <button type="button" class="wm-filter-btn" data-mode="LOW" title="Low: Tiêu chuẩn an toàn, mẫu ≥6 lần">🛡️ Low (≥6)</button>
-              <button type="button" class="wm-filter-btn active" data-mode="HIGH" title="High: Kỷ luật cao, mẫu ≥8 lần (Khuyên dùng)">🎯 High (≥8)</button>
-              <button type="button" class="wm-filter-btn" data-mode="ULTRA" title="Ultra: Bắn tỉa an toàn tuyệt đối, mẫu ≥10 lần">💎 Ultra (≥10)</button>
+              <button type="button" class="wm-filter-btn" data-mode="FLASH" title="Flash (≥3): Thu nhận đánh giá sớm, nhưng độ bất định rất lớn">⚡ Flash (≥3)</button>
+              <button type="button" class="wm-filter-btn" data-mode="LOW" title="Low (≥6): Kiểm tra với nhiều quan sát hơn">🛡️ Low (≥6)</button>
+              <button type="button" class="wm-filter-btn active" data-mode="HIGH" title="High (≥8): Yêu cầu số mẫu cao hơn (Khuyên dùng)">🎯 High (≥8)</button>
             </div>
           </div>
 

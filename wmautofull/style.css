@@ -979,16 +979,18 @@
 .wm-ai-filter-toggle {
   display: flex;
   gap: 4px;
-  flex-wrap: wrap;
+  flex: 1;
 }
 
 .wm-filter-btn {
+  flex: 1;
+  text-align: center;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #94a3b8;
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 600;
-  padding: 4px 7px;
+  padding: 4px 6px;
   border-radius: 5px;
   cursor: pointer;
   transition: all 0.2s;

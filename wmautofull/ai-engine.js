@@ -609,8 +609,10 @@
       // FIX 6: Trạng thái não AI ('EMPTY' | 'TRAINED')
       this.brainState = 'EMPTY';
 
-      // Cấu hình các chế độ lọc mô hình AI (Model Sensitivity Modes)
-      // Flash (≥3), Medium (≥5), Low (≥6), High (≥8 - Mặc định), Ultra (≥10)
+      // Cấu hình 3 chế độ nhạy mô hình AI:
+      // Flash (≥3): Thu nhận đánh giá sớm, nhưng độ bất định rất lớn
+      // Low (≥6): Kiểm tra với nhiều quan sát hơn
+      // High (≥8): Yêu cầu số mẫu cao hơn (Mặc định)
       this.filterModes = {
         FLASH: {
           name: 'Flash',
@@ -619,43 +621,25 @@
           streakMinSupport: 3,
           tableMinSupport: 8,
           minConsensusMargin: 0.55,
-          desc: 'Tần suất cược cao, bắt nhịp nhanh với mẫu ngắn ≥ 3 ván'
-        },
-        MEDIUM: {
-          name: 'Medium',
-          label: '⚖️ Medium (≥5)',
-          markovMinSupport: 5,
-          streakMinSupport: 4,
-          tableMinSupport: 10,
-          minConsensusMargin: 0.57,
-          desc: 'Cân bằng giữa tốc độ và độ an toàn, mẫu ≥ 5 ván'
+          desc: 'Thu nhận đánh giá sớm, nhưng độ bất định rất lớn (Ngưỡng mẫu ≥3)'
         },
         LOW: {
           name: 'Low',
           label: '🛡️ Low (≥6)',
           markovMinSupport: 6,
-          streakMinSupport: 5,
+          streakMinSupport: 6,
           tableMinSupport: 12,
           minConsensusMargin: 0.58,
-          desc: 'Tiêu chuẩn, giảm thiểu rủi ro, mẫu ≥ 6 ván'
+          desc: 'Kiểm tra với nhiều quan sát hơn (Ngưỡng mẫu ≥6)'
         },
         HIGH: {
           name: 'High',
           label: '🎯 High (≥8)',
           markovMinSupport: 8,
-          streakMinSupport: 6,
+          streakMinSupport: 8,
           tableMinSupport: 15,
           minConsensusMargin: 0.58,
-          desc: 'Kỷ luật cao, lọc tín hiệu chặt chẽ, mẫu ≥ 8 ván (Mặc định)'
-        },
-        ULTRA: {
-          name: 'Ultra',
-          label: '💎 Ultra (≥10)',
-          markovMinSupport: 10,
-          streakMinSupport: 8,
-          tableMinSupport: 20,
-          minConsensusMargin: 0.60,
-          desc: 'Bắn tỉa an toàn tuyệt đối, chỉ cược khi mẫu xuất hiện ≥ 10 ván'
+          desc: 'Yêu cầu số mẫu cao hơn (Ngưỡng mẫu ≥8 - Mặc định)'
         }
       };
       this.currentFilterMode = 'HIGH';
