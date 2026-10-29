@@ -23,6 +23,18 @@
     const data = event.data;
     if (!data || !data.action) return;
 
+    // Xác thực nguồn: Chỉ chấp nhận message từ window.parent hoặc window.top
+    if (event.source !== window.parent && event.source !== window.top) return;
+
+    // Xác thực action chỉ cho phép các lệnh đã biết
+    const ALLOWED_ACTIONS = ['FIND_ELEMENT', 'CLICK_ELEMENT', 'GET_INFO', 'GET_ALL_IDS',
+      'FIND_IN_NESTED_IFRAME', 'CLICK_IN_NESTED_IFRAME', 'GET_TABLES',
+      'CLICK_BET_ZONE', 'CLICK_CONFIRM', 'FORCE_SCROLL_TABLES', 'SELECT_CHIP'];
+    if (!ALLOWED_ACTIONS.includes(data.action)) return;
+
+    // Xác thực messageId phải là number (nếu có)
+    if (data.messageId !== undefined && typeof data.messageId !== 'number') return;
+
     switch (data.action) {
       case 'FIND_ELEMENT':
         findElement(data.selector, data.type, data.messageId);

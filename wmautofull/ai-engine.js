@@ -310,22 +310,37 @@
   class TableLearner {
     constructor() {
       this.name = 'Mô hình Cân Bằng Bàn (Shoe Dynamics)';
-      this.tableShoeStats = {}; // { tableId: { B: 15, P: 18, T: 2, total: 35 } }
+      this.tableShoeStats = {}; // { 'tableId:shoeId': { B, P, T, total } }
       this.minSupport = 15; // Cần ít nhất 15 ván trong shoe bàn
     }
 
-    trainRound(tableId, outcome) {
-      if (!this.tableShoeStats[tableId]) {
-        this.tableShoeStats[tableId] = { B: 0, P: 0, T: 0, total: 0 };
+    // FIX 5: Thêm tham số shoeId, key = tableId:shoeId
+    trainRound(tableId, shoeId, outcome) {
+      // Backward-compat: nếu shoeId không được truyền vào (gọi kiểu cũ)
+      if (typeof shoeId === 'string' && (shoeId === 'B' || shoeId === 'P' || shoeId === 'T')) {
+        // shoeId thực ra là outcome (gọi kiểu cũ trainRound(tableId, outcome))
+        outcome = shoeId;
+        shoeId = 1;
+      }
+      const key = tableId + ':' + (shoeId || 1);
+      if (!this.tableShoeStats[key]) {
+        this.tableShoeStats[key] = { B: 0, P: 0, T: 0, total: 0 };
       }
       if (outcome === 'B' || outcome === 'P' || outcome === 'T') {
-        this.tableShoeStats[tableId][outcome]++;
-        this.tableShoeStats[tableId].total++;
+        this.tableShoeStats[key][outcome]++;
+        this.tableShoeStats[key].total++;
       }
     }
 
-    predict(tableId, history) {
-      const stats = this.tableShoeStats[tableId];
+    // FIX 5: predict theo key = tableId:shoeId
+    predict(tableId, shoeId, history) {
+      // Backward-compat: nếu shoeId là array (gọi kiểu cũ predict(tableId, history))
+      if (Array.isArray(shoeId)) {
+        history = shoeId;
+        shoeId = 1;
+      }
+      const key = tableId + ':' + (shoeId || 1);
+      const stats = this.tableShoeStats[key];
       if (!stats || stats.total < this.minSupport) return null;
 
       const nonTie = stats.B + stats.P;
@@ -354,13 +369,14 @@
       return {
         model: this.name,
         tableId: tableId,
+        shoeId: shoeId,
         support: stats.total,
         probB: probB,
         probP: probP,
         predicted: predicted,
         confidence: confidence,
         isSufficient: stats.total >= this.minSupport,
-        rationale: `Bàn ${tableId} có tỷ lệ tổng: ${stats.B}B - ${stats.P}P - ${stats.T}T (${Math.round(ratioB * 100)}% B)`
+        rationale: `Bàn ${tableId} shoe#${shoeId}: ${stats.B}B - ${stats.P}P - ${stats.T}T (${Math.round(ratioB * 100)}% B)`
       };
     }
   }
@@ -507,14 +523,28 @@
       const topModel = activeBets[0];
       const consensusNames = activeBets.map(m => m.key).join(' + ');
 
+      // FIX 7: Tìm topModelName từ model có weight lớn nhất (trong các model không phải PASS)
+      let bestWeightKey = null;
+      let bestWeightVal = -1;
+      for (const pred of activeBets) {
+        const w = this.weights[pred.key] || 1.0;
+        if (w > bestWeightVal) {
+          bestWeightVal = w;
+          bestWeightKey = pred;
+        }
+      }
+
       return {
         predicted: unanimousSide,
         probB: finalProbB,
         probP: finalProbP,
-        confidence: Math.min(1.0, (chosenProb - 0.5) * 2.5),
+        // FIX 7: tách predictedProbability và confidenceScore
+        predictedProbability: chosenProb,
+        confidenceScore: Math.abs(chosenProb - 0.5) * 2,
+        confidence: Math.min(1.0, (chosenProb - 0.5) * 2.5), // giữ nguyên để không break UI
         rationale: `[Đồng thuận ${consensusNames}] ${topModel ? topModel.rationale : ''} (Xác suất ${(chosenProb * 100).toFixed(1)}%)`,
         contributors: activeBets,
-        topModelName: topModel ? topModel.model : 'Đồng thuận đa mô hình',
+        topModelName: bestWeightKey ? bestWeightKey.model : 'Đồng thuận đa mô hình',
         gatePassed: true,
         gateReason: 'APPROVED'
       };
@@ -568,6 +598,16 @@
       // Bộ lọc chống học trùng ván đa luồng (Round Deduplication Cache)
       this.processedRounds = new Set();
 
+      // FIX 4: Shoe ID tracking để phát hiện shoe reset theo từng bàn
+      this.tableShoeIds = {};           // { tableId: shoeId (int, bắt đầu từ 1) }
+      this.tablePrevHistoryLen = {};    // { tableId: số ván ở lần scan trước }
+
+      // FIX 7: Chống đếm PASS trùng theo opportunity
+      this.countedOpportunities = new Set();
+
+      // FIX 6: Trạng thái não AI ('EMPTY' | 'TRAINED')
+      this.brainState = 'EMPTY';
+
       // Chế độ cược an toàn: 'PAPER' (Mặc định - chỉ mô phỏng & học) hoặc 'REAL' (cược tiền thật)
       this.tradingMode = localStorage.getItem('wm_ai_trading_mode') || 'PAPER';
       this.sessionId = 'session_' + Date.now();
@@ -577,6 +617,21 @@
       this.bridgeConnected = false;
 
       this.isReadyPromise = this.loadSavedState();
+    }
+
+    // FIX 4: Phát hiện shoe reset theo từng bàn
+    detectShoeReset(tableId, historyLength) {
+      const prev = this.tablePrevHistoryLen[tableId];
+      if (prev !== undefined && historyLength < prev) {
+        // Lịch sử bị reset => shoe mới
+        this.tableShoeIds[tableId] = (this.tableShoeIds[tableId] || 1) + 1;
+        console.log(`[AI Engine] Shoe reset bàn ${tableId}: shoe #${this.tableShoeIds[tableId]}`);
+      }
+      if (!this.tableShoeIds[tableId]) {
+        this.tableShoeIds[tableId] = 1;
+      }
+      this.tablePrevHistoryLen[tableId] = historyLength;
+      return this.tableShoeIds[tableId];
     }
 
     async loadSavedState() {
@@ -640,6 +695,7 @@
       if (brainData && (fileRounds >= idbRounds || idbRounds === 0)) {
         this.applyKnowledge(brainData);
         this.bridgeConnected = bridgeConnected;
+        this.brainState = 'TRAINED'; // FIX 6
         console.log(`[AI Engine] Đã nạp trực tiếp bộ não AI thành công! (${fileRounds} ván | ${this.stats.patternsLearnedCount} mẫu)`);
         await this.persistKnowledge();
       } else if (savedKnowledge) {
@@ -649,6 +705,7 @@
         if (savedKnowledge.tableShoeStats) this.tableLearner.tableShoeStats = savedKnowledge.tableShoeStats;
         if (savedStats) this.stats = Object.assign(this.stats, savedStats);
         this.bridgeConnected = bridgeConnected;
+        this.brainState = 'TRAINED'; // FIX 6
       } else if (brainData) {
         this.applyKnowledge(brainData);
         this.bridgeConnected = bridgeConnected;
@@ -661,6 +718,7 @@
     }
 
     loadPretrainedBaseline() {
+      /* DISABLED: baseline_giả
       this.markov.ngramCounts = {
         'B': { B: 18, P: 17, T: 4, total: 35 },
         'P': { B: 17, P: 18, T: 4, total: 35 },
@@ -679,17 +737,25 @@
         'B_3': { continue: 5, break: 14 },
         'P_3': { continue: 5, break: 14 }
       };
+      */
+      // Intentionally empty: Do not seed fake data.
+      // AI learns exclusively from real observed rounds.
+      this.brainState = 'EMPTY';
+      console.log('[AI Engine] Khởi tạo sạch — chờ thu thập dữ liệu thực tế.');
     }
 
     exportKnowledge() {
       return {
         version: 2,
         exportedAt: new Date().toISOString(),
+        brainState: this.brainState,        // FIX 6: expose cho UI
         weights: this.ensemble.weights,
         markovCounts: this.markov.ngramCounts,
         streakStats: this.streak.streakStats,
         tableShoeStats: this.tableLearner.tableShoeStats,
+        tableShoeIds: this.tableShoeIds,    // FIX 4: persist shoe IDs
         rollingWindow: this.rollingWindow.slice(-20),
+        observedRoundIds: Array.from(this.processedRounds).slice(-5000), // FIX 4: persist (max 5000)
         stats: {
           totalRoundsObserved: this.stats.totalRoundsObserved || 0,
           predictionsScored: this.stats.predictionsScored || 0,
@@ -720,6 +786,13 @@
       if (data.rollingWindow && Array.isArray(data.rollingWindow)) {
         this.rollingWindow = data.rollingWindow.slice(-20);
       }
+      // FIX 4: restore shoe IDs và processed rounds
+      if (data.tableShoeIds && typeof data.tableShoeIds === 'object') {
+        this.tableShoeIds = Object.assign(this.tableShoeIds, data.tableShoeIds);
+      }
+      if (data.observedRoundIds && Array.isArray(data.observedRoundIds)) {
+        data.observedRoundIds.slice(-5000).forEach(k => this.processedRounds.add(k));
+      }
       if (data.stats) {
         this.stats = Object.assign(this.stats, data.stats);
         this.netUnitsWon = this.stats.netUnitsWon || 0;
@@ -731,6 +804,10 @@
           this.underperformReason = 'Khôi phục từ phiên trước: Hiệu suất gần đây yếu';
         }
       }
+      // FIX 6: đánh dấu não đã được nạp dữ liệu thật
+      const hasRealData = (this.stats.totalRoundsObserved || 0) > 0
+        || Object.keys(this.markov.ngramCounts).length > 0;
+      if (hasRealData) this.brainState = 'TRAINED';
       this.notifyStats();
       return true;
     }
@@ -812,15 +889,18 @@
     onRoundCompleted(tableId, tableName, previousHistory, newOutcome) {
       if (!newOutcome) return;
 
-      // 1. CHỐNG HỌC TRÙNG (Round Deduplication Filter):
-      // Một ván chỉ được ghi nhận và học đúng 1 lần duy nhất, kể cả khi dữ liệu đến từ nhiều luồng (scanner, iframe, websocket)
+      // FIX 4: Phát hiện shoe reset và lấy shoeId ổn định
+      const histLen = previousHistory ? previousHistory.length : 0;
+      const shoeId = this.detectShoeReset(tableId, histLen);
+
+      // 1. CHỐNG HỌC TRÙNG (Round Deduplication Filter) — FIX 4: dùng shoeId trong roundKey
       const prevSig = (previousHistory && previousHistory.length > 0) ? previousHistory.slice(-6).join('') : 'init';
-      const roundKey = `${tableId}_#${previousHistory ? previousHistory.length : 0}_${prevSig}_${newOutcome}`;
+      const roundKey = `${tableId}:shoe${shoeId}:r${histLen}:${newOutcome}`;
       if (this.processedRounds.has(roundKey)) {
         return; // Đã xử lý ván này rồi -> bỏ qua ngay lập tức, tuyệt đối không học trùng
       }
       this.processedRounds.add(roundKey);
-      if (this.processedRounds.size > 2000) {
+      if (this.processedRounds.size > 5000) {
         const oldest = Array.from(this.processedRounds).slice(0, 500);
         oldest.forEach(k => this.processedRounds.delete(k));
       }
@@ -929,7 +1009,10 @@
       // 3. HỌC TRỰC TUYẾN NGAY LẬP TỨC TRÊN DỮ LIỆU VÁN MỚI (SAU KHI ĐÃ ĐỐI CHIẾU NGOÀI MẪU)
       this.markov.trainRound(previousHistory, newOutcome);
       this.streak.trainRound(previousHistory, newOutcome);
-      this.tableLearner.trainRound(tableId, newOutcome);
+      // FIX 5: TableLearner tách theo shoe — key = tableId:shoeId
+      this.tableLearner.trainRound(tableId, shoeId, newOutcome);
+      // FIX 6: Cập nhật brainState khi đã có dữ liệu thật
+      if (this.brainState === 'EMPTY') this.brainState = 'TRAINED';
 
       // Lưu ván vào DB
       this.db.saveRound({
@@ -971,9 +1054,11 @@
       }
 
       // 1. Chạy 3 bộ học song song
+      // FIX 4+5: lấy shoeId hiện tại, truyền vào TableLearner
+      const currentShoeId = this.tableShoeIds[tableId] || 1;
       const subMarkov = this.markov.predict(history);
       const subStreak = this.streak.predict(history);
-      const subTable = this.tableLearner.predict(tableId, history);
+      const subTable = this.tableLearner.predict(tableId, currentShoeId, history);
 
       // 2. ĐIỀU KIỆN 2: ĐÁNH GIÁ ĐỒNG THUẬN & BIÊN AN TOÀN QUA ENSEMBLE GATING
       const combined = this.ensemble.combine({
@@ -982,9 +1067,19 @@
         table: subTable
       });
 
-      if (combined.predicted === 'PASS') {
-        this.totalPassCount++;
-        this.stats.totalPassCount = this.totalPassCount;
+      // FIX 7: Chống đếm PASS trùng theo opportunity (tableId:shoeId:historyLen)
+      const oppId = `${tableId}:${currentShoeId}:${history.length}`;
+      if (!this.countedOpportunities.has(oppId)) {
+        this.countedOpportunities.add(oppId);
+        if (combined.predicted === 'PASS') {
+          this.totalPassCount++;
+          this.stats.totalPassCount = this.totalPassCount;
+        }
+        // Giới hạn size countedOpportunities
+        if (this.countedOpportunities.size > 10000) {
+          const iter = this.countedOpportunities.values();
+          this.countedOpportunities.delete(iter.next().value);
+        }
       }
 
       const predictionRecord = {

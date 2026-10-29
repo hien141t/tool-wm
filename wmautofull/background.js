@@ -12,9 +12,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   // 1. NẠP DỮ LIỆU NÃO AI TRỰC TIẾP
+  // FIX 8: Thứ tự ưu tiên đúng: Bridge > chrome.storage.local > bundled file
+  // Kết hợp so sánh revision để chọn nguồn mới nhất
   if (request.action === 'AI_FETCH_BRAIN') {
     (async () => {
-      // Ưu tiên 1: Thử lấy từ Local Sync Bridge (http://127.0.0.1:8421/brain)
+      let bridgeData = null;
+      let storageData = null;
+      let bundledData = null;
+
+      // --- Ưu tiên 1: Thử lấy từ Local Sync Bridge (http://127.0.0.1:8421/brain) ---
       try {
         const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
         const timeoutId = controller ? setTimeout(() => controller.abort(), 1200) : null;
@@ -27,33 +33,81 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (resp.ok) {
           const data = await resp.json();
           if (data && (data.weights || data.markovCounts)) {
-            console.log('[WM Background] Đã nạp não thành công từ Local Sync Bridge');
-            sendResponse({
-              success: true,
-              source: 'bridge',
-              bridgeConnected: true,
-              data: data
-            });
-            return;
+            bridgeData = data;
+            console.log('[WM Background] Đã nạp não từ Local Sync Bridge');
           }
         }
       } catch (err) {
         // Bridge không bật hoặc timeout
       }
 
-      // Ưu tiên 2: Đọc file ai_brain.json đóng gói sẵn trong thư mục Extension
+      // --- Ưu tiên 2: Đọc sao lưu từ chrome.storage.local ---
+      try {
+        const stored = await chrome.storage.local.get(['wm_ai_brain_state']);
+        if (stored && stored.wm_ai_brain_state) {
+          storageData = stored.wm_ai_brain_state;
+        }
+      } catch (e) {}
+
+      // --- FIX 8: So sánh revision giữa Bridge và Storage ---
+      // Nếu storage có revision cao hơn Bridge, ưu tiên storage
+      if (bridgeData && storageData) {
+        const bridgeRev = typeof bridgeData.revision === 'number' ? bridgeData.revision : 0;
+        const storageRev = typeof storageData.revision === 'number' ? storageData.revision : 0;
+        if (storageRev > bridgeRev) {
+          console.log(`[WM Background] Storage (rev=${storageRev}) mới hơn Bridge (rev=${bridgeRev}), ưu tiên Storage.`);
+          sendResponse({
+            success: true,
+            source: 'storage',
+            bridgeConnected: true,
+            data: storageData
+          });
+          return;
+        }
+        // Bridge có revision >= storage → dùng Bridge
+        sendResponse({
+          success: true,
+          source: 'bridge',
+          bridgeConnected: true,
+          data: bridgeData
+        });
+        return;
+      }
+
+      if (bridgeData) {
+        sendResponse({
+          success: true,
+          source: 'bridge',
+          bridgeConnected: true,
+          data: bridgeData
+        });
+        return;
+      }
+
+      if (storageData) {
+        sendResponse({
+          success: true,
+          source: 'storage',
+          bridgeConnected: false,
+          data: storageData
+        });
+        return;
+      }
+
+      // --- Ưu tiên 3 (cuối cùng): Đọc file ai_brain.json đóng gói sẵn ---
       try {
         const bundledUrl = chrome.runtime.getURL('ai_brain.json');
         const bResp = await fetch(bundledUrl);
         if (bResp.ok) {
           const bData = await bResp.json();
           if (bData && (bData.weights || bData.markovCounts)) {
-            console.log('[WM Background] Đã nạp não từ file ai_brain.json đóng gói');
+            bundledData = bData;
+            console.log('[WM Background] Đã nạp não từ file ai_brain.json đóng gói (fallback cuối)');
             sendResponse({
               success: true,
               source: 'bundled_file',
               bridgeConnected: false,
-              data: bData
+              data: bundledData
             });
             return;
           }
@@ -61,20 +115,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } catch (err) {
         console.warn('[WM Background] Lỗi đọc bundled ai_brain.json:', err);
       }
-
-      // Ưu tiên 3: Đọc sao lưu từ chrome.storage.local
-      try {
-        const stored = await chrome.storage.local.get(['wm_ai_brain_state']);
-        if (stored && stored.wm_ai_brain_state) {
-          sendResponse({
-            success: true,
-            source: 'storage',
-            bridgeConnected: false,
-            data: stored.wm_ai_brain_state
-          });
-          return;
-        }
-      } catch (e) {}
 
       sendResponse({ success: false, error: 'Không tìm thấy dữ liệu não AI' });
     })();
@@ -98,12 +138,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       // Gửi sang Local Bridge để ghi đè vào file ai_brain.json trên ổ cứng
       let bridgeSaved = false;
       try {
+        // Đọc token từ Bridge (Bridge tự sinh khi khởi động)
+        // Background không cần token để đọc (GET), nhưng cần token để ghi (POST)
+        // Token được lưu ở bridge_token.txt, background không có quyền đọc file hệ thống
+        // → dùng header Authorization nếu token được cung cấp qua payload
+        const bridgeToken = payload._bridgeToken || '';
+        const headers = { 'Content-Type': 'application/json' };
+        if (bridgeToken) {
+          headers['Authorization'] = 'Bearer ' + bridgeToken;
+        }
+        // Tạo bản sao payload không có _bridgeToken để không lưu vào file
+        const payloadClean = Object.assign({}, payload);
+        delete payloadClean._bridgeToken;
+
         const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
         const timeoutId = controller ? setTimeout(() => controller.abort(), 1500) : null;
         const resp = await fetch('http://127.0.0.1:8421/brain', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          headers: headers,
+          body: JSON.stringify(payloadClean),
           signal: controller ? controller.signal : undefined
         });
         if (timeoutId) clearTimeout(timeoutId);
