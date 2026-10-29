@@ -1218,19 +1218,35 @@ class WMAutoHelper {
         let card = el;
         let foundCard = null;
 
-        for (let step = 0; step < 8; step++) {
-          if (!card || card === doc.body || isBotElement(card)) break;
-          card = card.parentElement;
-          if (!card || isBotElement(card)) break;
+        // Ưu tiên container chuẩn của WM nếu có: [id^="groupMultiple_"]
+        const wmContainer = el.closest ? el.closest('[id^="groupMultiple_"], .gameroom-box, [class*="gameroom-box"]') : null;
+        if (wmContainer && !isBotElement(wmContainer)) {
+          foundCard = wmContainer;
+        }
 
-          const cardText = card.innerText || card.textContent || '';
-          if (/Player/i.test(cardText) && /Banker/i.test(cardText)) {
-            const matchTitles = cardText.match(/(?:\([^)]+\))?\s*Bac\s*\d+/gi) || [];
-            if (matchTitles.length === 1) {
-              foundCard = card;
-            } else if (matchTitles.length > 1) {
-              break;
+        if (!foundCard) {
+          for (let step = 0; step < 8; step++) {
+            if (!card || card === doc.body || isBotElement(card)) break;
+            card = card.parentElement;
+            if (!card || isBotElement(card)) break;
+
+            const cardText = card.innerText || card.textContent || '';
+            if (/Player/i.test(cardText) && /Banker/i.test(cardText)) {
+              const matchTitles = cardText.match(/(?:\([^)]+\))?\s*Bac\s*\d+/gi) || [];
+              if (matchTitles.length === 1) {
+                foundCard = card;
+              } else if (matchTitles.length > 1) {
+                break;
+              }
             }
+          }
+        }
+
+        // Nếu tìm thấy card nhưng có container cha groupMultiple_ thì nâng cấp lên container chuẩn
+        if (foundCard && foundCard.closest) {
+          const gmParent = foundCard.closest('[id^="groupMultiple_"]');
+          if (gmParent && !isBotElement(gmParent)) {
+            foundCard = gmParent;
           }
         }
 
@@ -1289,22 +1305,67 @@ class WMAutoHelper {
     if (!cardNode) return null;
     let cleanId = cardNode.id;
     if (!cleanId || cleanId.startsWith('elem_') || cleanId.startsWith('box_')) {
-      cleanId = rawTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+      const gmNode = (cardNode.id && cardNode.id.startsWith('groupMultiple_')) ? cardNode : (cardNode.closest ? cardNode.closest('[id^="groupMultiple_"]') : null);
+      if (gmNode && gmNode.id) {
+        cleanId = gmNode.id;
+      } else {
+        cleanId = rawTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+      }
     }
 
     // 1. Tìm nút cược Player & Banker
     let playerBtn = null;
     let bankerBtn = null;
+    const docOwner = cardNode.ownerDocument || document;
 
-    const allDescendants = cardNode.querySelectorAll('*');
-    for (const el of allDescendants) {
-      if (el.children.length <= 2) {
-        const t = (el.innerText || el.textContent || '').trim();
-        if (/^Player/i.test(t) || t === '1:1') {
-          playerBtn = el.closest('button, div[class*="bet"], div') || el;
-        }
-        if (/^Banker/i.test(t) || t === '1:0.95') {
-          bankerBtn = el.closest('button, div[class*="bet"], div') || el;
+    // 1.1. Tìm trực tiếp theo ID nếu cleanId bắt đầu bằng groupMultiple_
+    if (cleanId && cleanId.startsWith('groupMultiple_')) {
+      playerBtn = cardNode.querySelector ? cardNode.querySelector(`[id="${cleanId}_betAreaPlayer"]`) : null;
+      if (!playerBtn && docOwner.getElementById) playerBtn = docOwner.getElementById(`${cleanId}_betAreaPlayer`);
+
+      bankerBtn = cardNode.querySelector ? cardNode.querySelector(`[id="${cleanId}_betAreaBanker"]`) : null;
+      if (!bankerBtn && docOwner.getElementById) bankerBtn = docOwner.getElementById(`${cleanId}_betAreaBanker`);
+    }
+
+    // 1.2. Tìm bằng XPath chuẩn người dùng cung cấp: (//div[@id='...'])[1]
+    if (!playerBtn && cleanId && docOwner.evaluate) {
+      try {
+        const xp = `(//div[@id='${cleanId}_betAreaPlayer'])[1]`;
+        const res = docOwner.evaluate(xp, docOwner, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        if (res && res.singleNodeValue) playerBtn = res.singleNodeValue;
+      } catch (e) {}
+    }
+    if (!bankerBtn && cleanId && docOwner.evaluate) {
+      try {
+        const xp = `(//div[@id='${cleanId}_betAreaBanker'])[1]`;
+        const res = docOwner.evaluate(xp, docOwner, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        if (res && res.singleNodeValue) bankerBtn = res.singleNodeValue;
+      } catch (e) {}
+    }
+
+    // 1.3. Tìm bằng wildcard selector trong cardNode
+    if (!playerBtn && cardNode.querySelector) {
+      playerBtn = cardNode.querySelector('[id$="_betAreaPlayer"], [id*="_betAreaPlayer"], .betAreaPlayer');
+    }
+    if (!bankerBtn && cardNode.querySelector) {
+      bankerBtn = cardNode.querySelector('[id$="_betAreaBanker"], [id*="_betAreaBanker"], .betAreaBanker');
+    }
+
+    // 1.4. Quét text nếu vẫn chưa tìm thấy (loại trừ nút Pair / Đôi)
+    if (!playerBtn || !bankerBtn) {
+      const allDescendants = cardNode.querySelectorAll ? cardNode.querySelectorAll('*') : [];
+      for (const el of allDescendants) {
+        if (!el.children || el.children.length <= 3) {
+          const t = (el.innerText || el.textContent || '').trim();
+          const isPair = /pair|đôi/i.test(t) || /pair|đôi/i.test(el.className || '') || /pair|đôi/i.test(el.id || '');
+          if (isPair) continue;
+
+          if (!playerBtn && (/^Player\s*(1:1)?$/i.test(t) || t === '1:1')) {
+            playerBtn = (el.closest ? el.closest('[id*="betArea"], button, div[class*="bet"], div') : null) || el;
+          }
+          if (!bankerBtn && (/^Banker\s*(1:0\.95)?$/i.test(t) || t === '1:0.95')) {
+            bankerBtn = (el.closest ? el.closest('[id*="betArea"], button, div[class*="bet"], div') : null) || el;
+          }
         }
       }
     }
@@ -1880,6 +1941,13 @@ class WMAutoHelper {
   selectGameChip(chipValue) {
     const chipStr = String(chipValue);
     try {
+      // 1. Thử click trực tiếp trong main document trước
+      const localChip = this.findValidVisibleChip(document, chipStr);
+      if (localChip) {
+        this.simulateRealClick(localChip);
+      }
+
+      // 2. Gửi tín hiệu tới các iframes
       const allIframes = Array.from(document.querySelectorAll('iframe'));
       // Chỉ gửi tới các iframe đang hiển thị thực tế (bỏ qua iframe display: none, width/height = 0)
       const visibleIframes = allIframes.filter((ifr) => {
@@ -1982,10 +2050,199 @@ class WMAutoHelper {
     } catch (err) {}
   }
 
+  // Tạo danh sách ID ứng viên cho bàn chơi theo chuẩn WM Casino
+  getCandidateTableIds(table) {
+    const candidates = new Set();
+    if (!table) return [];
+
+    if (table.id) candidates.add(table.id);
+    if (table.rawId) candidates.add(table.rawId);
+    if (table.cardNode && table.cardNode.id) candidates.add(table.cardNode.id);
+    try {
+      const closestContainer = table.cardNode?.closest?.('[id^="groupMultiple_"]');
+      if (closestContainer && closestContainer.id) candidates.add(closestContainer.id);
+    } catch (e) {}
+
+    const allStrings = [table.id, table.rawId, table.name, table.cardNode?.id].filter(Boolean);
+    for (const str of allStrings) {
+      const gmMatch = str.match(/groupMultiple_(\d+)_(\d+)/i);
+      if (gmMatch) {
+        candidates.add(`groupMultiple_${gmMatch[1]}_${gmMatch[2]}`);
+        candidates.add(`groupMultiple_101_${gmMatch[2]}`);
+      }
+    }
+
+    const nameStr = table.name || '';
+    const isSexy = /sexy/i.test(nameStr) || /sexy/i.test(table.id || '');
+    const isClassic = /classic/i.test(nameStr) || /classic/i.test(table.id || '');
+    const isSpeed = /speed/i.test(nameStr) || /speed/i.test(table.id || '');
+
+    const numMatches = (nameStr + ' ' + (table.id || '')).match(/\b\d+\b/g) || [];
+    const numbers = Array.from(new Set(numMatches.map(n => parseInt(n)).filter(n => !isNaN(n) && n > 0)));
+
+    for (const num of numbers) {
+      candidates.add(`groupMultiple_101_${num}`);
+      candidates.add(`groupMultiple_101_${String(num).padStart(2, '0')}`);
+
+      if (isSexy || (num >= 1 && num <= 50)) {
+        candidates.add(`groupMultiple_101_${500 + num}`);
+      }
+      if (num >= 501 && num <= 599) {
+        candidates.add(`groupMultiple_101_${num}`);
+      }
+
+      if (isClassic || (num >= 1 && num <= 50)) {
+        candidates.add(`groupMultiple_101_${100 + num}`);
+      }
+      if (num >= 101 && num <= 199) {
+        candidates.add(`groupMultiple_101_${num}`);
+      }
+
+      if (isSpeed || (num >= 1 && num <= 50)) {
+        candidates.add(`groupMultiple_101_${200 + num}`);
+      }
+
+      if (num >= 900 && num <= 999) {
+        candidates.add(`groupMultiple_101_${num}`);
+      }
+    }
+
+    return Array.from(candidates);
+  }
+
+  // Tìm nút cược Player / Banker bằng ID, XPath chuẩn và DOM traversal
+  findTargetBetButton(table, betTarget) {
+    const betSuffix = betTarget === 'B' ? 'Banker' : 'Player';
+    const candidateIds = this.getCandidateTableIds(table);
+
+    const docs = [document];
+    const allIframes = Array.from(document.querySelectorAll('iframe'));
+    for (const ifr of allIframes) {
+      try {
+        const iDoc = ifr.contentDocument || ifr.contentWindow?.document;
+        if (iDoc && !docs.includes(iDoc)) docs.push(iDoc);
+      } catch (e) {}
+    }
+
+    // 1. Tìm theo ID chính xác trên tất cả documents
+    for (const doc of docs) {
+      if (!doc) continue;
+      for (const cid of candidateIds) {
+        try {
+          if (doc.getElementById) {
+            const el = doc.getElementById(`${cid}_betArea${betSuffix}`);
+            if (el) return el;
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 2. Tìm theo XPath chính xác người dùng cung cấp: (//div[@id='${cid}_betArea${betSuffix}'])[1]
+    for (const doc of docs) {
+      if (!doc || !doc.evaluate) continue;
+      for (const cid of candidateIds) {
+        try {
+          const xpath = `(//div[@id='${cid}_betArea${betSuffix}'])[1]`;
+          const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+          if (res && res.singleNodeValue) return res.singleNodeValue;
+        } catch (e) {}
+        try {
+          const xpathAny = `(//*[@id='${cid}_betArea${betSuffix}'])[1]`;
+          const res = doc.evaluate(xpathAny, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+          if (res && res.singleNodeValue) return res.singleNodeValue;
+        } catch (e) {}
+      }
+    }
+
+    // 3. Tìm trong phạm vi cardNode của bàn nếu có
+    if (table.cardNode) {
+      try {
+        const sel = `[id$="_betArea${betSuffix}"], [id*="_betArea${betSuffix}"], .betArea${betSuffix}, [class*="betArea${betSuffix}"]`;
+        const el = table.cardNode.querySelector ? table.cardNode.querySelector(sel) : null;
+        if (el) return el;
+      } catch (e) {}
+
+      try {
+        const allCardEls = table.cardNode.querySelectorAll ? table.cardNode.querySelectorAll('div, button, span, a') : [];
+        for (const el of allCardEls) {
+          const txt = (el.innerText || el.textContent || '').trim();
+          const isPair = /pair|đôi/i.test(txt) || /pair|đôi/i.test(el.className || '') || /pair|đôi/i.test(el.id || '');
+          if (isPair) continue;
+
+          if (betSuffix === 'Banker') {
+            if (/^Banker\s*(1:0\.95)?$/i.test(txt) || txt === '1:0.95' || /庄/i.test(txt)) {
+              return (el.closest ? el.closest('[id*="betArea"], button, div[class*="bet"]') : null) || el;
+            }
+          } else {
+            if (/^Player\s*(1:1)?$/i.test(txt) || txt === '1:1' || /闲/i.test(txt)) {
+              return (el.closest ? el.closest('[id*="betArea"], button, div[class*="bet"]') : null) || el;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 4. Fallback vào nút đã lưu trong table
+    const cachedBtn = betTarget === 'B' ? table.bankerBtn : table.playerBtn;
+    if (cachedBtn) return cachedBtn;
+
+    return null;
+  }
+
+  // Phát tín hiệu cược tới iframe kèm danh sách Candidate IDs
+  async broadcastClickBetZoneToIframes(tableId, candidateIds, betTarget, chip) {
+    const allIframes = Array.from(document.querySelectorAll('iframe'));
+    if (allIframes.length === 0) return false;
+
+    const msgId = ++this.messageIdCounter;
+
+    return new Promise((resolve) => {
+      let resolved = false;
+
+      const timer = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          window.removeEventListener('message', onMessage);
+          resolve(false);
+        }
+      }, 600);
+
+      const onMessage = (event) => {
+        const data = event.data;
+        if (!data || data.type !== 'WM_IFRAME_RESPONSE') return;
+        if (data.messageId === msgId || data.action === 'CLICK_BET_ZONE') {
+          if (data.success) {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timer);
+              window.removeEventListener('message', onMessage);
+              resolve(true);
+            }
+          }
+        }
+      };
+
+      window.addEventListener('message', onMessage);
+
+      allIframes.forEach((ifr) => {
+        try {
+          ifr.contentWindow?.postMessage({
+            action: 'CLICK_BET_ZONE',
+            tableId: tableId,
+            candidateIds: candidateIds,
+            bet: betTarget,
+            chip: chip,
+            messageId: msgId
+          }, '*');
+        } catch (e) {}
+      });
+    });
+  }
+
   async executeBet(table, pattern, reason = '') {
     const betTarget = typeof pattern === 'string' ? pattern : (pattern.bet || 'B');
     const betTargetName = betTarget === 'B' ? 'Banker' : 'Player';
-    const currentChip = this.actualGameChip || this.selectedChip;
+    const currentChip = this.actualGameChip || this.selectedChip || 10;
     const amount = currentChip;
 
     this.addLog(`Đang cược chip ${currentChip} vào ${betTargetName} (${table.name || table.id})...`, 'info');
@@ -1993,30 +2250,43 @@ class WMAutoHelper {
     let betSuccess = false;
 
     try {
-      // 1. Cuộn bàn vào tầm nhìn
-      if (table.cardNode) {
-        table.cardNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 1. Tự động chọn chip trước khi cược
+      this.selectGameChip(currentChip);
+
+      // 2. Cuộn bàn vào tầm nhìn
+      if (table.cardNode && table.cardNode.scrollIntoView) {
+        try {
+          table.cardNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch (e) {}
         await new Promise(r => setTimeout(r, 200));
       }
 
-      // 2. Xác định nút cược tương ứng
-      const targetBtn = betTarget === 'B' ? table.bankerBtn : table.playerBtn;
+      // 3. Tìm nút cược chính xác bằng ID và XPath
+      let targetBtn = this.findTargetBetButton(table, betTarget);
 
       if (targetBtn) {
         this.triggerFullClick(targetBtn);
 
         // Bấm xác nhận cược nếu có nút confirm
-        if (table.cardNode) {
-          const confirmBtn = table.cardNode.querySelector('[id*="confirm"], .confirm, .btn-confirm, [class*="confirm"], [class*="ok"]');
-          if (confirmBtn) {
-            this.triggerFullClick(confirmBtn);
-          }
+        const docOwner = targetBtn.ownerDocument || document;
+        const confirmBtn = (table.cardNode && table.cardNode.querySelector && table.cardNode.querySelector('[id*="confirm"], .confirm, .btn-confirm, [class*="confirm"], [class*="ok"]')) ||
+          (docOwner.querySelector ? docOwner.querySelector('[id*="confirm"], .confirm, .btn-confirm, [class*="confirm"], [class*="ok"]') : null);
+        if (confirmBtn) {
+          this.triggerFullClick(confirmBtn);
         }
 
         betSuccess = true;
         this.addLog(`✅ Đã đặt cược ${amount} vào ${betTargetName} (${table.name || table.id})!`, 'success');
       } else {
-        this.addLog(`Không tìm thấy nút cược ${betTargetName} trên bàn ${table.name || table.id}!`, 'warning');
+        // 4. Nếu DOM chính chưa bắt được, phát lệnh CLICK_BET_ZONE tới iframe
+        const candidateIds = this.getCandidateTableIds(table);
+        const iframeSuccess = await this.broadcastClickBetZoneToIframes(table.id, candidateIds, betTarget, currentChip);
+        if (iframeSuccess) {
+          betSuccess = true;
+          this.addLog(`✅ Đã đặt cược ${amount} vào ${betTargetName} (${table.name || table.id}) qua iframe!`, 'success');
+        } else {
+          this.addLog(`Không tìm thấy nút cược ${betTargetName} trên bàn ${table.name || table.id}!`, 'warning');
+        }
       }
 
     } catch (err) {

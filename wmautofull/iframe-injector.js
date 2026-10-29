@@ -45,7 +45,7 @@
         getTables(data.messageId);
         break;
       case 'CLICK_BET_ZONE':
-        clickBetZone(data.tableId, data.bet, data.messageId);
+        clickBetZone(data.tableId, data.bet, data.messageId, data.candidateIds);
         break;
       case 'CLICK_CONFIRM':
         clickConfirm(data.tableId, data.messageId);
@@ -586,29 +586,87 @@
     }
   }
 
-  function clickBetZone(tableId, bet, messageId) {
+  function clickBetZone(tableId, bet, messageId, candidateIds = []) {
     try {
       const doc = getTargetDoc();
-      const betAreaId = bet === 'B' ? tableId + '_betAreaBanker' : tableId + '_betAreaPlayer';
-      let betArea = doc.getElementById(betAreaId);
+      const betSuffix = bet === 'B' ? 'Banker' : 'Player';
+      const allCandidates = Array.isArray(candidateIds) ? [...candidateIds] : [];
+      if (tableId && !allCandidates.includes(tableId)) allCandidates.unshift(tableId);
 
+      let betArea = null;
+
+      // 1. Thử theo danh sách Candidate IDs: doc.getElementById(`${cid}_betArea${betSuffix}`)
+      for (const cid of allCandidates) {
+        if (!cid) continue;
+        betArea = doc.getElementById(`${cid}_betArea${betSuffix}`);
+        if (betArea) break;
+      }
+
+      // 2. Thử theo XPath người dùng cung cấp: (//div[@id='${cid}_betArea${betSuffix}'])[1]
+      if (!betArea && doc.evaluate) {
+        for (const cid of allCandidates) {
+          if (!cid) continue;
+          try {
+            const xpath = `(//div[@id='${cid}_betArea${betSuffix}'])[1]`;
+            const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+            if (res && res.singleNodeValue) {
+              betArea = res.singleNodeValue;
+              break;
+            }
+          } catch (e) {}
+          try {
+            const xpathAny = `(//*[@id='${cid}_betArea${betSuffix}'])[1]`;
+            const res = doc.evaluate(xpathAny, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+            if (res && res.singleNodeValue) {
+              betArea = res.singleNodeValue;
+              break;
+            }
+          } catch (e) {}
+        }
+      }
+
+      // 3. Thử wildcard selector
       if (!betArea) {
-        // Tìm theo text trên H5
-        const targetText = bet === 'B' ? /Banker/i : /Player/i;
+        betArea = doc.querySelector(`[id$="_betArea${betSuffix}"], [id*="_betArea${betSuffix}"]`);
+      }
+
+      // 4. Tìm theo text trên H5 (loại trừ nút Pair / Đôi)
+      if (!betArea) {
+        const targetRegex = bet === 'B' ? /^Banker\s*(1:0\.95)?$/i : /^Player\s*(1:1)?$/i;
         const allNodes = doc.querySelectorAll('*');
         for (const el of allNodes) {
-          if (el.children.length === 0 && targetText.test(el.innerText || '')) {
-            betArea = el.closest('button, div[class*="bet"]') || el;
-            break;
+          if (el.children.length === 0) {
+            const txt = (el.innerText || el.textContent || '').trim();
+            if (/pair|đôi/i.test(txt) || /pair|đôi/i.test(el.className || '') || /pair|đôi/i.test(el.id || '')) continue;
+            if (targetRegex.test(txt) || (bet === 'B' && txt === '1:0.95') || (bet === 'P' && txt === '1:1')) {
+              betArea = el.closest('button, div[class*="bet"]') || el;
+              break;
+            }
           }
         }
       }
 
       if (betArea) {
-        betArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        betArea.click();
+        try { betArea.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+        try {
+          betArea.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+          betArea.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+        } catch (e) {}
+        try { betArea.click(); } catch (e) {}
+
+        // Bấm nút confirm nếu có
+        try {
+          const confirmBtn = doc.querySelector('[id*="confirm"], .confirm, .btn-confirm, [class*="confirm"], [class*="ok"]');
+          if (confirmBtn) {
+            confirmBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+            confirmBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+            confirmBtn.click();
+          }
+        } catch (e) {}
+
         window.parent.postMessage({
           type: 'WM_IFRAME_RESPONSE',
+          action: 'CLICK_BET_ZONE',
           messageId: messageId,
           success: true,
           tableId: tableId,
@@ -617,6 +675,7 @@
       } else {
         window.parent.postMessage({
           type: 'WM_IFRAME_RESPONSE',
+          action: 'CLICK_BET_ZONE',
           messageId: messageId,
           success: false,
           error: 'Bet area not found'
@@ -625,6 +684,7 @@
     } catch (err) {
       window.parent.postMessage({
         type: 'WM_IFRAME_RESPONSE',
+        action: 'CLICK_BET_ZONE',
         messageId: messageId,
         success: false,
         error: err.message

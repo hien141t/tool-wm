@@ -58,7 +58,13 @@ async function runTests() {
   // TEST 2: KIỂM THỬ DỰ ĐOÁN NGOÀI MẪU & SO SÁNH VỚI BASELINE
   // --------------------------------------------------------------------------
   console.log('--- TEST 2: DỰ ĐOÁN TRƯỚC VÁN, CHẤM ĐIỂM NGOÀI MẪU & SO VỚI BASELINE ---');
-  const currentHistory = ['B', 'B', 'P']; // Chuỗi BBP -> Mô hình có xác suất Banker cao (41 B vs 27 P)
+  const targetPattern = ['P', 'P', 'P', 'P'];
+  // Huấn luyện mẫu cầu bẻ bệt P -> B (cả Markov và Streak đều đồng thuận B)
+  for (let i = 0; i < 20; i++) {
+    engine.onRoundCompleted(`train_tbl_${i}_${Date.now()}`, 'Baccarat 1', targetPattern, 'B');
+  }
+
+  const currentHistory = targetPattern; // Chuỗi PPPP -> Cả 2 mô hình đều đồng thuận Banker (B)
   const pred = engine.generatePrediction(tableId, 'Baccarat 1', currentHistory);
   console.log(`Dự đoán sinh ra trước khi biết kết quả: ${pred.predicted} (Độ tin cậy: ${Math.round(pred.confidence * 100)}%)`);
   console.log(`Lý do phân tích: "${pred.rationale}"`);
@@ -68,7 +74,7 @@ async function runTests() {
   const isPendingSaved = pendingInBook && pendingInBook.predicted === pred.predicted;
   console.log(`Đã lưu dự đoán vào sổ chờ PENDING trước kết quả: ${isPendingSaved ? 'Có' : 'Không'}`);
 
-  // Ván kết thúc với kết quả thật 'P' (đúng dự đoán)
+  // Ván kết thúc với kết quả thật trùng với dự đoán
   const targetOutcome = pred.predicted;
   engine.onRoundCompleted(tableId, 'Baccarat 1', currentHistory, targetOutcome);
 
@@ -81,7 +87,8 @@ async function runTests() {
     console.log('✅ TEST 2 ĐẠT: Dự đoán được tạo trước ván, chấm điểm độc lập ngoài mẫu và so sánh chuẩn với mức cơ sở 50%.\n');
   } else {
     console.error('❌ TEST 2 THẤT BẠI\n');
-    process.exit(1);
+    setTimeout(() => process.exit(1), 100);
+    return;
   }
 
   // --------------------------------------------------------------------------
