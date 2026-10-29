@@ -457,12 +457,69 @@
         if (savedKnowledge.weights) this.ensemble.weights = savedKnowledge.weights;
         if (savedKnowledge.markovCounts) this.markov.ngramCounts = savedKnowledge.markovCounts;
         if (savedKnowledge.streakStats) this.streak.streakStats = savedKnowledge.streakStats;
+      } else {
+        // Nạp trọng số cơ sở (Pre-trained Baseline) nếu là Profile mới chạy lần đầu
+        this.loadPretrainedBaseline();
       }
       const savedStats = await this.db.loadKnowledge('ai_engine_stats');
       if (savedStats) {
         this.stats = Object.assign(this.stats, savedStats);
       }
       this.notifyStats();
+    }
+
+    loadPretrainedBaseline() {
+      this.markov.ngramCounts = {
+        'B': { B: 18, P: 17, T: 4 },
+        'P': { B: 17, P: 18, T: 4 },
+        'BB': { B: 12, P: 10, T: 2 },
+        'PP': { B: 10, P: 12, T: 2 },
+        'BP': { B: 11, P: 9, T: 2 },
+        'PB': { B: 9, P: 11, T: 2 },
+        'BBB': { B: 7, P: 8, T: 1 },
+        'PPP': { B: 8, P: 7, T: 1 },
+        'BPB': { B: 6, P: 9, T: 1 },
+        'PBP': { B: 9, P: 6, T: 1 }
+      };
+      this.streak.streakStats = {
+        'streak_B_2': { continueCount: 12, breakCount: 10 },
+        'streak_P_2': { continueCount: 12, breakCount: 10 },
+        'streak_B_3': { continueCount: 7, breakCount: 9 },
+        'streak_P_3': { continueCount: 7, breakCount: 9 },
+        'alt_3': { continueCount: 9, breakCount: 6 }
+      };
+    }
+
+    exportKnowledge() {
+      return {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        weights: this.ensemble.weights,
+        markovCounts: this.markov.ngramCounts,
+        streakStats: this.streak.streakStats,
+        stats: {
+          totalRoundsObserved: this.stats.totalRoundsObserved || 0,
+          predictionsScored: this.stats.predictionsScored || 0,
+          wins: this.stats.wins || 0,
+          losses: this.stats.losses || 0,
+          tiesPush: this.stats.tiesPush || 0,
+          accuracy: this.stats.accuracy || 0,
+          patternsLearnedCount: Object.keys(this.markov.ngramCounts).length + Object.keys(this.streak.streakStats).length
+        }
+      };
+    }
+
+    async importKnowledge(data) {
+      if (!data || typeof data !== 'object') return false;
+      if (data.weights) this.ensemble.weights = Object.assign(this.ensemble.weights, data.weights);
+      if (data.markovCounts) this.markov.ngramCounts = Object.assign(this.markov.ngramCounts, data.markovCounts);
+      if (data.streakStats) this.streak.streakStats = Object.assign(this.streak.streakStats, data.streakStats);
+      if (data.stats) {
+        this.stats = Object.assign(this.stats, data.stats);
+      }
+      await this.persistKnowledge();
+      this.notifyStats();
+      return true;
     }
 
     async persistKnowledge() {

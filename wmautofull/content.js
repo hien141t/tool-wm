@@ -319,9 +319,16 @@ class WMAutoHelper {
               </tbody>
             </table>
           </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-            <button type="button" class="wm-clear-log-btn" id="wm-ai-reset-memory-btn">🧹 Đặt lại bộ nhớ học</button>
-            <span style="font-size:10px; color:#64748b;">Lưu cục bộ IndexedDB • Không gửi ra ngoài</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:6px; flex-wrap:wrap;">
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="wm-ai-action-btn" id="wm-ai-export-btn" title="Xuất toàn bộ mẫu cầu & trọng số AI thành file JSON để mang sang profile khác">📤 Xuất não AI</button>
+              <button type="button" class="wm-ai-action-btn" id="wm-ai-import-btn" title="Nạp file não AI đã học từ profile khác">📥 Nạp não AI</button>
+              <input type="file" id="wm-ai-import-file" accept=".json" style="display:none;">
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="wm-clear-log-btn" id="wm-ai-reset-memory-btn" style="color:#ef4444; margin-top:0;">🧹 Đặt lại</button>
+              <span style="font-size:10px; color:#64748b;">Lưu cục bộ IndexedDB</span>
+            </div>
           </div>
         </div>
       </div>
@@ -484,6 +491,51 @@ class WMAutoHelper {
           this.aiEngine.setTradingMode('REAL');
           this.addLog('⚠️ Đã chuyển sang chế độ: CƯỢC THẬT (Bot sẽ tự đặt tiền thật khi bấm Bắt đầu)', 'warning');
         }
+      });
+    }
+
+    // Xuất bộ não AI thành file JSON
+    const exportAiBtn = document.getElementById('wm-ai-export-btn');
+    if (exportAiBtn) {
+      exportAiBtn.addEventListener('click', () => {
+        if (!this.aiEngine) return;
+        const data = this.aiEngine.exportKnowledge();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `wm_ai_brain_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.addLog('📤 Đã xuất file bộ não AI (JSON) thành công!', 'success');
+      });
+    }
+
+    // Nạp bộ não AI từ file JSON
+    const importAiBtn = document.getElementById('wm-ai-import-btn');
+    const importAiFile = document.getElementById('wm-ai-import-file');
+    if (importAiBtn && importAiFile) {
+      importAiBtn.addEventListener('click', () => importAiFile.click());
+      importAiFile.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+          try {
+            const data = JSON.parse(evt.target.result);
+            if (this.aiEngine) {
+              const ok = await this.aiEngine.importKnowledge(data);
+              if (ok) {
+                this.addLog(`📥 Nạp bộ não AI thành công! (${this.aiEngine.stats.patternsLearnedCount} mẫu đã tích lũy)`, 'success');
+              } else {
+                this.addLog('❌ File dữ liệu AI không đúng định dạng!', 'error');
+              }
+            }
+          } catch (err) {
+            this.addLog(`❌ Lỗi đọc file AI: ${err.message}`, 'error');
+          }
+        };
+        reader.readAsText(file);
       });
     }
 
@@ -1445,6 +1497,12 @@ class WMAutoHelper {
 
     const resetBtn = document.getElementById('wm-ai-reset-memory-btn');
     if (resetBtn) resetBtn.disabled = locked;
+
+    const exportBtn = document.getElementById('wm-ai-export-btn');
+    if (exportBtn) exportBtn.disabled = locked;
+
+    const importBtn = document.getElementById('wm-ai-import-btn');
+    if (importBtn) importBtn.disabled = locked;
   }
 
   // ==========================================================================
