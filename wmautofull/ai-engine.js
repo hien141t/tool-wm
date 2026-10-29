@@ -697,26 +697,25 @@
       let bridgeConnected = false;
 
       // 1. Nạp trực tiếp qua Background Service Worker (Không bị Mixed Content chặn)
+      // 1. Nạp qua Background Service Worker (nếu có chrome.runtime)
       try {
-        const bgRes = await new Promise((resolve) => {
-          if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+          const bgRes = await new Promise((resolve) => {
             chrome.runtime.sendMessage({ action: 'AI_FETCH_BRAIN' }, res => {
-              if (chrome.runtime.lastError) resolve(null);
+              if (chrome.runtime?.lastError) resolve(null);
               else resolve(res);
             });
-          } else {
-            resolve(null);
-          }
-        });
+          });
 
-        if (bgRes && bgRes.success && bgRes.data) {
-          brainData = bgRes.data;
-          bridgeConnected = !!bgRes.bridgeConnected;
+          if (bgRes && bgRes.success && bgRes.data) {
+            brainData = bgRes.data;
+            bridgeConnected = !!bgRes.bridgeConnected;
+          }
         }
       } catch (e) {}
 
-      // Fallback khi chạy ngoài môi trường Extension (ví dụ test NodeJS không có chrome.runtime)
-      if (!brainData && (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage)) {
+      // 2. Fallback trực tiếp CHỈ khi chạy trong môi trường NodeJS (không có window)
+      if (!brainData && typeof window === 'undefined') {
         try {
           const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
           const timeoutId = controller ? setTimeout(() => controller.abort(), 1200) : null;
@@ -897,7 +896,7 @@
         await this.db.saveKnowledge('ai_engine_stats', this.stats);
       } catch (e) {}
 
-      // 1. Tự động lưu qua Background Service Worker (Vượt Mixed Content & CORS an toàn)
+      // 1. Tự động lưu qua Background Service Worker (khi có chrome.runtime)
       try {
         if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
           chrome.runtime.sendMessage({ action: 'AI_SAVE_BRAIN', payload }, res => {
@@ -908,14 +907,33 @@
         }
       } catch (e) {}
 
-      // 2. Fallback trực tiếp chỉ khi chạy trong NodeJS test runner (không có chrome.runtime)
-      if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+      // Nếu đang trong môi trường trình duyệt (có window): DỪNG TẠI ĐÂY, tuyệt đối không gọi fetch trực tiếp từ webpage
+      if (typeof window !== 'undefined') {
+        return;
+      }
+
+      // 2. Fallback trực tiếp CHỈ khi chạy trong môi trường NodeJS test runner (không có window)
+      const isNodeEnvironment = typeof window === 'undefined' && typeof process !== 'undefined' && process.versions?.node;
+      if (isNodeEnvironment) {
         try {
+          // Lấy token nếu bridge yêu cầu
+          let token = null;
+          try {
+            const tokResp = await fetch('http://127.0.0.1:8421/token');
+            if (tokResp.ok) {
+              const tokData = await tokResp.json();
+              token = tokData.token;
+            }
+          } catch (te) {}
+
+          const headers = { 'Content-Type': 'application/json' };
+          if (token) headers['Authorization'] = 'Bearer ' + token;
+
           const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
           const timeoutId = controller ? setTimeout(() => controller.abort(), 1500) : null;
           const resp = await fetch('http://127.0.0.1:8421/brain', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: headers,
             body: JSON.stringify(payload),
             signal: controller ? controller.signal : undefined
           });
