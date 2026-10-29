@@ -171,7 +171,68 @@ async function runConstraintTests() {
     process.exit(1);
   }
 
-  console.log('🎉 TẤT CẢ CÁC BÀI KIỂM THỬ RÀNG BUỘC HẠN MỨC ĐỀU THÀNH CÔNG 100%!');
+  // Test 6: Kiểm tra cấu hình cược đồng thời tối đa
+  console.log('--- TEST 6: CẤU HÌNH CƯỢC ĐỒNG THỜI TỐI ĐA (Mặc định 3 lệnh) ---');
+  console.log(`Cược tối đa cùng lúc: ${bot.maxConcurrentBets}`);
+  if (bot.maxConcurrentBets === 3) {
+    console.log('✅ TEST 6 ĐẠT: Mặc định tối đa 3 lệnh cược cùng lúc\n');
+  } else {
+    console.error('❌ TEST 6 THẤT BẠI\n');
+    process.exit(1);
+  }
+
+  // Test 7: Chặn cược khi đã đạt số lệnh PENDING tối đa
+  console.log('--- TEST 7: CHẶN CƯỢC KHI ĐÃ ĐẠT SỐ LỆNH ĐỒNG THỜI TỐI ĐA ---');
+  bot.stats.totalAmount = 1000;
+  bot.maxTotalBet = 5000;
+  bot.maxConcurrentBets = 3;
+  bot.isRunning = true;
+  bot.betHistory = [
+    { tableId: 't1', result: 'PENDING', success: true },
+    { tableId: 't2', result: 'PENDING', success: true },
+    { tableId: 't3', result: 'PENDING', success: true }
+  ];
+  console.log(`Số lệnh đang pending: ${bot.getPendingBetsCount()} / ${bot.maxConcurrentBets}`);
+  bot.updateLimitProgressUI();
+  const concurrentText = domElements['wm-concurrent-status-text'].textContent;
+  const concurrentBadge = domElements['wm-concurrent-badge'].textContent;
+  console.log(`UI hiển thị cược đồng thời: "${concurrentText}" - Badge: "${concurrentBadge}"`);
+
+  let betExecutedWhenFull = false;
+  bot.executeBet = async () => { betExecutedWhenFull = true; };
+  const mockTable4 = {
+    id: 'tbl_test_4',
+    name: 'Bàn 4',
+    history: ['P', 'B', 'P'],
+    betTime: 12
+  };
+  await bot.evaluateSingleTable(mockTable4);
+  if (!betExecutedWhenFull && concurrentBadge === 'ĐANG ĐẦY') {
+    console.log('✅ TEST 7 ĐẠT: Đã chặn lệnh cược thứ 4 khi đang có 3 lệnh PENDING và UI báo ĐANG ĐẦY\n');
+  } else {
+    console.error('❌ TEST 7 THẤT BẠI: Vẫn cược vượt quá số lệnh đồng thời!\n');
+    process.exit(1);
+  }
+
+  // Test 8: Khi một lệnh PENDING hoàn tất -> mở khóa cược tiếp
+  console.log('--- TEST 8: MỞ KHÓA CƯỢC KHI CÓ LỆNH HOÀN TẤT ---');
+  bot.betHistory[0].result = 'WIN'; // Bàn t1 đã xong
+  console.log(`Sau khi 1 bàn hoàn tất, số lệnh pending còn: ${bot.getPendingBetsCount()}`);
+  bot.updateLimitProgressUI();
+  const unblockedBadge = domElements['wm-concurrent-badge'].textContent;
+  console.log(`UI sau khi giải phóng slot: Badge: "${unblockedBadge}"`);
+
+  let betExecutedAfterUnblock = false;
+  bot.executeBet = async () => { betExecutedAfterUnblock = true; };
+  await bot.evaluateSingleTable(mockTable4);
+  if (betExecutedAfterUnblock && unblockedBadge === 'SẴN SÀNG') {
+    console.log('✅ TEST 8 ĐẠT: Sau khi giải phóng slot, bot tiếp tục nhận lệnh cược mới thành công\n');
+  } else {
+    console.error('❌ TEST 8 THẤT BẠI: Không mở lại cược khi còn slot trống!\n');
+    process.exit(1);
+  }
+
+  console.log('🎉 TẤT CẢ CÁC BÀI KIỂM THỬ RÀNG BUỘC HẠN MỨC & CƯỢC ĐỒNG THỜI ĐỀU THÀNH CÔNG 100%!');
 }
 
 runConstraintTests().catch(err => {
