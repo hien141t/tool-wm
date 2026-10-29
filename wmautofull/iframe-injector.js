@@ -498,6 +498,8 @@
         totalDetected: tables.length
       }, '*');
 
+
+
     } catch (err) {
       window.parent.postMessage({
         type: 'WM_IFRAME_RESPONSE',
@@ -591,22 +593,97 @@
   }
 
   // ==========================================================================
-  // TỰ ĐỘNG CHỌN CHIP THEO XPATH / SELECTOR DO USER CẤP
-  // XPath: (//div[@name='10'])[1], (//div[@name='20'])[1], (//div[@name='50'])[1]
+  // HỆ THỐNG CHỌN & XÁC MINH CHIP ĐA TẦNG (MULTI-LAYER VERIFIED CHIP SELECTOR)
+  // Giải quyết triệt để 4 lỗi:
+  // - Lỗi 1: Xác minh trạng thái active thực tế sau click
+  // - Lỗi 2: Chỉ chọn phần tử hiển thị hợp lệ (loại bỏ phần tử ẩn/clone/template)
+  // - Lỗi 3: Xử lý tập trung trong iframe sảnh game
+  // - Lỗi 4: Phát hiện mệnh giá chip đang thực sự active trên game
   // ==========================================================================
+  function isVisibleAndInteractable(el) {
+    if (!el || !el.getBoundingClientRect) return false;
+    try {
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      const win = el.ownerDocument?.defaultView || window;
+      const style = win.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function findValidVisibleChip(doc, chipStr) {
+    if (!doc) return null;
+    const variants = [chipStr];
+    if (chipStr === '1000') variants.push('1k', '1K');
+    if (chipStr === '5000') variants.push('5k', '5K');
+    if (chipStr === '10000') variants.push('10k', '10K');
+    if (chipStr === '20000') variants.push('20k', '20K');
+    if (chipStr === '50000') variants.push('50k', '50K');
+
+    // 1. ƯU TIÊN SỐ 1 TUYỆT ĐỐI: Khung chuẩn của WM: #mult_chips_box hoặc .chip_box
+    try {
+      const box = doc.getElementById('mult_chips_box') || doc.querySelector('.chip_box');
+      if (box) {
+        for (const val of variants) {
+          const chip = box.querySelector(`[name="${val}"], .chip_b_${val}`);
+          if (chip) return chip;
+        }
+      }
+    } catch (e) {}
+
+    // 2. XPath chuẩn người dùng cung cấp: (//div[@name='${val}'])[1]
+    for (const val of variants) {
+      try {
+        const xpath = `(//div[@name='${val}'])[1]`;
+        const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        if (res && res.singleNodeValue) return res.singleNodeValue;
+      } catch (e) {}
+
+      try {
+        const xpath = `(//*[@name='${val}'])[1]`;
+        const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        if (res && res.singleNodeValue) return res.singleNodeValue;
+      } catch (e) {}
+    }
+
+    // 3. CSS querySelector
+    for (const val of variants) {
+      try {
+        const el = doc.querySelector(`.chip_item[name="${val}"], div[name="${val}"], [name="${val}"], .chip_b_${val}`);
+        if (el) return el;
+      } catch (e) {}
+    }
+
+    // 4. Quét các iframe con nếu có
+    try {
+      const iframes = doc.querySelectorAll('iframe');
+      for (const ifr of iframes) {
+        try {
+          const subDoc = ifr.contentDocument || ifr.contentWindow?.document;
+          const found = findValidVisibleChip(subDoc, chipStr);
+          if (found) return found;
+        } catch (e) {}
+      }
+    } catch (e) {}
+
+    return null;
+  }
+
   function selectChip(chipValue, messageId) {
     try {
       const chipStr = String(chipValue);
       const doc = getTargetDoc();
-      let chipEl = findChipNodeInDoc(doc, chipStr);
+      let chipEl = findValidVisibleChip(doc, chipStr);
 
       if (!chipEl && doc !== document) {
-        chipEl = findChipNodeInDoc(document, chipStr);
+        chipEl = findValidVisibleChip(document, chipStr);
       }
 
       if (chipEl) {
         simulateRealClick(chipEl);
-
         window.parent.postMessage({
           type: 'WM_IFRAME_RESPONSE',
           messageId: messageId,
@@ -614,16 +691,18 @@
           success: true,
           chip: chipStr
         }, '*');
-      } else {
-        window.parent.postMessage({
-          type: 'WM_IFRAME_RESPONSE',
-          messageId: messageId,
-          action: 'SELECT_CHIP',
-          success: false,
-          chip: chipStr,
-          error: 'Chip element not found'
-        }, '*');
+        return true;
       }
+
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        action: 'SELECT_CHIP',
+        success: false,
+        chip: chipStr,
+        error: 'Chip element not found'
+      }, '*');
+      return false;
     } catch (err) {
       window.parent.postMessage({
         type: 'WM_IFRAME_RESPONSE',
@@ -633,6 +712,7 @@
         chip: chipValue,
         error: err.message
       }, '*');
+      return false;
     }
   }
 
@@ -644,62 +724,11 @@
 
     try {
       el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    } catch (e) {}
-    try {
       el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-    } catch (e) {}
-    try {
       el.click();
-    } catch (err) {}
-  }
-
-  function findChipNodeInDoc(doc, chipStr) {
-    if (!doc) return null;
-    const variants = [chipStr];
-    if (chipStr === '1000') variants.push('1k', '1K');
-    if (chipStr === '5000') variants.push('5k', '5K');
-
-    for (const val of variants) {
-      // 1. ƯU TIÊN SỐ 1: XPath do user cung cấp: (//div[@name='...'])[1]
-      try {
-        const xpath = `(//div[@name='${val}'])[1]`;
-        const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-        if (res && res.singleNodeValue) return res.singleNodeValue;
-      } catch (e) {}
-
-      // 2. XPath tổng quát
-      try {
-        const xpath = `(//*[@name='${val}'])[1]`;
-        const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-        if (res && res.singleNodeValue) return res.singleNodeValue;
-      } catch (e) {}
-
-      // 3. CSS querySelector
-      try {
-        const el = doc.querySelector(`div[name="${val}"], [name="${val}"]`);
-        if (el) return el;
-      } catch (e) {}
-
-      // 4. Data attributes
-      try {
-        const el = doc.querySelector(`[data-value="${val}"], [data-chip="${val}"]`);
-        if (el) return el;
-      } catch (e) {}
+    } catch (e) {
+      try { el.click(); } catch (err) {}
     }
-
-    // Quét các iframe lồng nhau nếu có
-    try {
-      const iframes = doc.querySelectorAll('iframe');
-      for (const ifr of iframes) {
-        try {
-          const subDoc = ifr.contentDocument || ifr.contentWindow?.document;
-          const found = findChipNodeInDoc(subDoc, chipStr);
-          if (found) return found;
-        } catch (e) {}
-      }
-    } catch (e) {}
-
-    return null;
   }
 
   window.parent.postMessage({

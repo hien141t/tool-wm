@@ -43,8 +43,7 @@ class WMAutoHelper {
     this.scanInterval = null;
     this.bettingLoopInterval = null;
     this.roadViewMode = localStorage.getItem('wm_road_view_mode') || 'scroll';
-    this.currentActiveChipOnGame = null; // Tránh bấm lại chip đã chọn
-    this._lastChipSelectTime = 0; // Throttle tránh click dồn dập
+    this.actualGameChip = null; // Mệnh giá chip thực tế đang active trên bàn game
 
     this.initApp();
   }
@@ -1499,38 +1498,22 @@ class WMAutoHelper {
     });
   }
 
-  async selectGameChip(chipValue) {
+  selectGameChip(chipValue) {
     const chipStr = String(chipValue);
-    let clickedLocally = false;
-
-    // 1. Tìm trực tiếp trong document chính: Nếu thấy thì click
-    try {
-      const elMain = this.findChipNodeInDocument(document, chipStr);
-      if (elMain) {
-        this.simulateRealClick(elMain);
-        this.addLog(`🎯 Đã click chọn Chip ${chipStr} trên màn hình!`, 'success');
-        clickedLocally = true;
-      }
-    } catch (e) {}
-
-    // 2. Gửi tín hiệu SELECT_CHIP tới iframe-injector trong tất cả iframe
     try {
       const iframes = document.querySelectorAll('iframe');
-      iframes.forEach((ifr) => {
-        try {
-          ifr.contentWindow?.postMessage({
-            action: 'SELECT_CHIP',
-            chip: chipStr,
-            messageId: ++this.messageIdCounter
-          }, '*');
-        } catch (e) {}
-      });
+      if (iframes.length > 0) {
+        iframes.forEach((ifr) => {
+          try {
+            ifr.contentWindow?.postMessage({
+              action: 'SELECT_CHIP',
+              chip: chipStr,
+              messageId: ++this.messageIdCounter
+            }, '*');
+          } catch (e) {}
+        });
+      }
     } catch (e) {}
-
-    if (!clickedLocally) {
-      this.addLog(`Đang gửi tín hiệu kích hoạt Chip ${chipStr} tới bàn game...`, 'info');
-    }
-
     return true;
   }
 
@@ -1539,55 +1522,55 @@ class WMAutoHelper {
     try {
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     } catch (e) {}
-
     try {
       el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    } catch (e) {}
-    try {
       el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-    } catch (e) {}
-    try {
       el.click();
-    } catch (e) {}
+    } catch (err) {
+      try { el.click(); } catch (e) {}
+    }
   }
 
-  findChipNodeInDocument(doc, chipStr) {
+  findValidVisibleChip(doc, chipStr) {
     if (!doc) return null;
 
     const variants = [chipStr];
     if (chipStr === '1000') variants.push('1k', '1K');
     if (chipStr === '5000') variants.push('5k', '5K');
+    if (chipStr === '10000') variants.push('10k', '10K');
+    if (chipStr === '20000') variants.push('20k', '20K');
+    if (chipStr === '50000') variants.push('50k', '50K');
 
+    // 1. Khung chuẩn của WM: #mult_chips_box hoặc .chip_box
+    try {
+      const box = doc.getElementById('mult_chips_box') || doc.querySelector('.chip_box');
+      if (box) {
+        for (const val of variants) {
+          const chip = box.querySelector(`[name="${val}"], .chip_b_${val}`);
+          if (chip) return chip;
+        }
+      }
+    } catch (e) {}
+
+    // 2. XPath chuẩn người dùng cung cấp: (//div[@name='${val}'])[1]
     for (const val of variants) {
-      // 1. ƯU TIÊN SỐ 1: XPath do người dùng cung cấp: (//div[@name='...'])[1]
       try {
         const xpath = `(//div[@name='${val}'])[1]`;
         const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
         if (res && res.singleNodeValue) return res.singleNodeValue;
       } catch (e) {}
 
-      // 2. XPath tổng quát: (//*[@name='...'])[1]
       try {
         const xpath = `(//*[@name='${val}'])[1]`;
         const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
         if (res && res.singleNodeValue) return res.singleNodeValue;
       } catch (e) {}
+    }
 
-      // 3. CSS querySelector div[name="..."]
+    // 3. CSS querySelector
+    for (const val of variants) {
       try {
-        const el = doc.querySelector(`div[name="${val}"]`);
-        if (el) return el;
-      } catch (e) {}
-
-      // 4. CSS selector [name="..."]
-      try {
-        const el = doc.querySelector(`[name="${val}"]`);
-        if (el) return el;
-      } catch (e) {}
-
-      // 5. Data attribute
-      try {
-        const el = doc.querySelector(`[data-value="${val}"], [data-chip="${val}"]`);
+        const el = doc.querySelector(`.chip_item[name="${val}"], div[name="${val}"], [name="${val}"], .chip_b_${val}`);
         if (el) return el;
       } catch (e) {}
     }
@@ -1898,7 +1881,7 @@ class WMAutoHelper {
       // Nhận phản hồi chọn Chip từ iframe-injector
       if (data.type === 'WM_IFRAME_RESPONSE' && data.action === 'SELECT_CHIP') {
         if (data.success) {
-          this.addLog(`🎯 [Bàn game] Đã chọn Chip ${data.chip} thành công!`, 'success');
+          this.addLog(`🎯 Đã chọn Chip ${data.chip} trên bàn game thành công!`, 'success');
         }
       }
 
