@@ -447,24 +447,65 @@
       this.sessionId = 'session_' + Date.now();
       this.onStatsChange = null;
 
+      // Trạng thái kết nối Local Sync Bridge (tự động lưu vào file ai_brain.json)
+      this.bridgeConnected = false;
+
       this.loadSavedState();
     }
 
     async loadSavedState() {
       await this.db.initPromise;
-      const savedKnowledge = await this.db.loadKnowledge('ai_engine_weights');
-      if (savedKnowledge) {
-        if (savedKnowledge.weights) this.ensemble.weights = savedKnowledge.weights;
-        if (savedKnowledge.markovCounts) this.markov.ngramCounts = savedKnowledge.markovCounts;
-        if (savedKnowledge.streakStats) this.streak.streakStats = savedKnowledge.streakStats;
-      } else {
-        // Nạp trọng số cơ sở (Pre-trained Baseline) nếu là Profile mới chạy lần đầu
-        this.loadPretrainedBaseline();
+
+      // 1. Ưu tiên cao nhất: Kiểm tra Local Sync Bridge (http://127.0.0.1:8421/brain)
+      // Giúp đọc trực tiếp từ file ai_brain.json dùng chung cho mọi Chrome Profile!
+      let loadedFromFile = false;
+      try {
+        const resp = await fetch('http://127.0.0.1:8421/brain', { method: 'GET', cache: 'no-cache' });
+        if (resp.ok) {
+          const fileData = await resp.json();
+          if (fileData && fileData.weights) {
+            await this.importKnowledge(fileData);
+            this.bridgeConnected = true;
+            loadedFromFile = true;
+            console.log('[AI Engine] Đã kết nối Local Bridge và tải dữ liệu từ file ai_brain.json thành công!');
+          }
+        }
+      } catch (err) {
+        this.bridgeConnected = false;
       }
-      const savedStats = await this.db.loadKnowledge('ai_engine_stats');
-      if (savedStats) {
-        this.stats = Object.assign(this.stats, savedStats);
+
+      if (!loadedFromFile) {
+        // 2. Kiểm tra IndexedDB của Profile hiện tại
+        const savedKnowledge = await this.db.loadKnowledge('ai_engine_weights');
+        if (savedKnowledge) {
+          if (savedKnowledge.weights) this.ensemble.weights = savedKnowledge.weights;
+          if (savedKnowledge.markovCounts) this.markov.ngramCounts = savedKnowledge.markovCounts;
+          if (savedKnowledge.streakStats) this.streak.streakStats = savedKnowledge.streakStats;
+        } else {
+          // 3. Nếu IndexedDB trống (Profile mới), đọc file ai_brain.json đóng gói sẵn trong extension!
+          try {
+            const bundledUrl = (typeof chrome !== 'undefined' && chrome.runtime?.getURL) ? chrome.runtime.getURL('ai_brain.json') : null;
+            if (bundledUrl) {
+              const bResp = await fetch(bundledUrl);
+              if (bResp.ok) {
+                const bData = await bResp.json();
+                await this.importKnowledge(bData);
+                loadedFromFile = true;
+              }
+            }
+          } catch (e) {}
+
+          if (!loadedFromFile) {
+            this.loadPretrainedBaseline();
+          }
+        }
+
+        const savedStats = await this.db.loadKnowledge('ai_engine_stats');
+        if (savedStats) {
+          this.stats = Object.assign(this.stats, savedStats);
+        }
       }
+
       this.notifyStats();
     }
 
@@ -523,14 +564,33 @@
     }
 
     async persistKnowledge() {
+      const payload = {
+        version: 1,
+        weights: this.ensemble.weights,
+        markovCounts: this.markov.ngramCounts,
+        streakStats: this.streak.streakStats,
+        stats: this.stats,
+        updatedAt: new Date().toISOString()
+      };
+
       try {
-        await this.db.saveKnowledge('ai_engine_weights', {
-          weights: this.ensemble.weights,
-          markovCounts: this.markov.ngramCounts,
-          streakStats: this.streak.streakStats
-        });
+        await this.db.saveKnowledge('ai_engine_weights', payload);
         await this.db.saveKnowledge('ai_engine_stats', this.stats);
       } catch (e) {}
+
+      // Tự động lưu thẳng vào file ai_brain.json qua Local Bridge (nếu đang chạy)
+      try {
+        const resp = await fetch('http://127.0.0.1:8421/brain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (resp.ok) {
+          this.bridgeConnected = true;
+        }
+      } catch (err) {
+        this.bridgeConnected = false;
+      }
     }
 
     setTradingMode(mode) {
@@ -544,7 +604,7 @@
     notifyStats() {
       this.stats.patternsLearnedCount = Object.keys(this.markov.ngramCounts).length + Object.keys(this.streak.streakStats).length;
       if (typeof this.onStatsChange === 'function') {
-        this.onStatsChange(this.stats, this.tradingMode);
+        this.onStatsChange(this.stats, this.tradingMode, this.bridgeConnected);
       }
     }
 

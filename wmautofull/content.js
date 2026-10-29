@@ -327,8 +327,11 @@ class WMAutoHelper {
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
               <button type="button" class="wm-clear-log-btn" id="wm-ai-reset-memory-btn" style="color:#ef4444; margin-top:0;">🧹 Đặt lại</button>
-              <span style="font-size:10px; color:#64748b;">Lưu cục bộ IndexedDB</span>
             </div>
+          </div>
+          <div style="margin-top:6px; font-size:10px; color:#64748b; display:flex; justify-content:space-between; align-items:center;">
+            <span id="wm-ai-bridge-status">⚪ Đang kiểm tra tự động lưu file ai_brain.json...</span>
+            <span>Tự đồng bộ đa Profile</span>
           </div>
         </div>
       </div>
@@ -569,10 +572,10 @@ class WMAutoHelper {
 
     // Kết nối sự kiện cập nhật thống kê AI
     if (this.aiEngine) {
-      this.aiEngine.onStatsChange = (stats, mode) => {
-        this.renderAIStats(stats, mode);
+      this.aiEngine.onStatsChange = (stats, mode, bridgeConnected) => {
+        this.renderAIStats(stats, mode, bridgeConnected);
       };
-      this.renderAIStats(this.aiEngine.stats, this.aiEngine.tradingMode);
+      this.renderAIStats(this.aiEngine.stats, this.aiEngine.tradingMode, this.aiEngine.bridgeConnected);
     }
 
     // Nút Bắt đầu / Dừng
@@ -1979,8 +1982,19 @@ class WMAutoHelper {
   // ==========================================================================
   // HIỂN THỊ THỐNG KÊ & NHẬT KÝ DỰ ĐOÁN AI (AI LEARNING CENTER)
   // ==========================================================================
-  renderAIStats(stats, mode) {
+  renderAIStats(stats, mode, bridgeConnected) {
     if (!this.overlay) return;
+
+    // 0. Cập nhật trạng thái tự động lưu file (Local Bridge)
+    const isBridge = (bridgeConnected !== undefined) ? bridgeConnected : (this.aiEngine?.bridgeConnected);
+    const bridgeIndicator = document.getElementById('wm-ai-bridge-status');
+    if (bridgeIndicator) {
+      if (isBridge) {
+        bridgeIndicator.innerHTML = '<span style="color:#10b981; font-weight:600;">🟢 Tự động lưu: <b>ai_brain.json</b> (Đã kết nối)</span>';
+      } else {
+        bridgeIndicator.innerHTML = '<span style="color:#94a3b8;" title="Chạy start_sync.bat trong thư mục extension để tự động ghi đè file">⚪ File Sync: Chạy <code>start_sync.bat</code> để tự lưu vào file</span>';
+      }
+    }
 
     // 1. Cập nhật Badge Mode & Nút
     const badge = document.getElementById('wm-ai-mode-badge');

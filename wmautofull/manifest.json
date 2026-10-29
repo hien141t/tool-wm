@@ -35,7 +35,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["ws-hook.js"],
+      "resources": ["ws-hook.js", "ai_brain.json"],
       "matches": ["<all_urls>"]
     }
   ],

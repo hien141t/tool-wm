@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "updatedAt": "2026-10-29T14:12:00.000Z",
+  "weights": {
+    "markov": 1.0,
+    "streak": 1.0,
+    "table": 0.6
+  },
+  "markovCounts": {
+    "B": { "B": 18, "P": 17, "T": 4 },
+    "P": { "B": 17, "P": 18, "T": 4 },
+    "BB": { "B": 12, "P": 10, "T": 2 },
+    "PP": { "B": 10, "P": 12, "T": 2 },
+    "BP": { "B": 11, "P": 9, "T": 2 },
+    "PB": { "B": 9, "P": 11, "T": 2 },
+    "BBB": { "B": 7, "P": 8, "T": 1 },
+    "PPP": { "B": 8, "P": 7, "T": 1 },
+    "BPB": { "B": 6, "P": 9, "T": 1 },
+    "PBP": { "B": 9, "P": 6, "T": 1 }
+  },
+  "streakStats": {
+    "streak_B_2": { "continueCount": 12, "breakCount": 10 },
+    "streak_P_2": { "continueCount": 12, "breakCount": 10 },
+    "streak_B_3": { "continueCount": 7, "breakCount": 9 },
+    "streak_P_3": { "continueCount": 7, "breakCount": 9 },
+    "alt_3": { "continueCount": 9, "breakCount": 6 }
+  },
+  "stats": {
+    "totalRoundsObserved": 25,
+    "predictionsScored": 10,
+    "wins": 6,
+    "losses": 4,
+    "tiesPush": 1,
+    "accuracy": 0.6,
+    "patternsLearnedCount": 15
+  }
+}
