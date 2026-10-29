@@ -664,6 +664,8 @@
 
       // Chế độ cược an toàn: 'PAPER' (Mặc định - chỉ mô phỏng & học) hoặc 'REAL' (cược tiền thật)
       this.tradingMode = (typeof localStorage !== 'undefined' ? localStorage.getItem('wm_ai_trading_mode') : null) || 'PAPER';
+      // Tự động hạ Paper Trading khi chuỗi thua (Mặc định: false để tôn trọng lệnh cược thật của người dùng)
+      this.autoPaperTrading = (typeof localStorage !== 'undefined' ? localStorage.getItem('wm_ai_auto_paper') === 'true' : false);
       this.sessionId = 'session_' + Date.now();
       this.onStatsChange = null;
 
@@ -713,8 +715,8 @@
         }
       } catch (e) {}
 
-      // Fallback khi chạy ngoài môi trường Extension (ví dụ test NodeJS)
-      if (!brainData) {
+      // Fallback khi chạy ngoài môi trường Extension (ví dụ test NodeJS không có chrome.runtime)
+      if (!brainData && (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage)) {
         try {
           const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
           const timeoutId = controller ? setTimeout(() => controller.abort(), 1200) : null;
@@ -906,21 +908,23 @@
         }
       } catch (e) {}
 
-      // 2. Fallback trực tiếp cho NodeJS test runner
-      try {
-        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-        const timeoutId = controller ? setTimeout(() => controller.abort(), 1500) : null;
-        const resp = await fetch('http://127.0.0.1:8421/brain', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller ? controller.signal : undefined
-        });
-        if (timeoutId) clearTimeout(timeoutId);
-        if (resp.ok) {
-          this.bridgeConnected = true;
-        }
-      } catch (err) {}
+      // 2. Fallback trực tiếp chỉ khi chạy trong NodeJS test runner (không có chrome.runtime)
+      if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+        try {
+          const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+          const timeoutId = controller ? setTimeout(() => controller.abort(), 1500) : null;
+          const resp = await fetch('http://127.0.0.1:8421/brain', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller ? controller.signal : undefined
+          });
+          if (timeoutId) clearTimeout(timeoutId);
+          if (resp.ok) {
+            this.bridgeConnected = true;
+          }
+        } catch (err) {}
+      }
     }
 
     setTradingMode(mode) {
@@ -931,6 +935,14 @@
         }
         this.notifyStats();
       }
+    }
+
+    setAutoPaperTrading(enabled) {
+      this.autoPaperTrading = !!enabled;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('wm_ai_auto_paper', this.autoPaperTrading ? 'true' : 'false');
+      }
+      this.notifyStats();
     }
 
     setFilterMode(modeKey, persist = true) {
@@ -1201,16 +1213,16 @@
       } else if (this.tradingMode !== 'REAL') {
         allowRealExecution = false;
         paperReason = 'Đang ở chế độ Paper Trading (Mô phỏng an toàn)';
-      } else if (this.isUnderperforming) {
-        // ĐIỀU KIỆN 3: Hiệu suất 20 ván gần đây sụt giảm
+      } else if (this.autoPaperTrading && this.isUnderperforming) {
+        // Chỉ tự động hạ Paper nếu người dùng bật tùy chọn bảo vệ này
         allowRealExecution = false;
         paperReason = `Hạ mức cược: ${this.underperformReason}`;
-      } else if (this.currentLossStreak >= 4) {
-        // ĐIỀU KIỆN 4: Chạm giới hạn chuỗi thua liên tiếp (Stop-Loss)
+      } else if (this.autoPaperTrading && this.currentLossStreak >= 4) {
+        // Kích hoạt Stop-Loss khi chuỗi thua dài
         allowRealExecution = false;
         paperReason = `Kích hoạt Stop-Loss: Chuỗi thua chạm mốc ${this.currentLossStreak} ván`;
       } else {
-        // VƯỢT QUA TOÀN BỘ 4 ĐIỀU KIỆN: ĐỦ TIÊU CHUẨN CƯỢC THẬT!
+        // Người dùng chọn REAL BET -> Cược thật 100%!
         allowRealExecution = true;
       }
 

@@ -176,13 +176,21 @@ async function runGatingTests() {
     model: 'Streak', key: 'streak', predicted: 'B', probB: 0.65, probP: 0.35, confidence: 0.30, support: 15, rationale: 'Test mạnh'
   });
 
+  // Test 3A: Khi người dùng KHÔNG bật autoPaperTrading (mặc định), bot vẫn cho phép cược thật (không tự ý huỷ cược thật)
+  engine.setAutoPaperTrading(false);
+  const realPred = engine.generatePrediction('test_guarded_tbl', 'Table Guard', ['P', 'P', 'P', 'P']);
+  assert.strictEqual(realPred.shouldBet, true, 'Khi autoPaperTrading tắt, bot phải tôn trọng lệnh cược thật của người dùng!');
+  assert.strictEqual(realPred.isPaperTrading, false);
+
+  // Test 3B: Khi người dùng BẬT autoPaperTrading, bot tự động hạ xuống Paper Trading khi hiệu suất sụt giảm
+  engine.setAutoPaperTrading(true);
   const guardedPred = engine.generatePrediction('test_guarded_tbl', 'Table Guard', ['P', 'P', 'P', 'P']);
   console.log(`Dự đoán sinh ra: ${guardedPred.predicted}`);
   console.log(`Cho phép cược thật (shouldBet): ${guardedPred.shouldBet}`);
   console.log(`Chế độ Paper Trading: ${guardedPred.isPaperTrading} | Lý do: "${guardedPred.paperTradingReason}"`);
-  assert.strictEqual(guardedPred.shouldBet, false, 'Khi hiệu suất gần đây giảm sút, cược thật phải bị chặn 100%!');
+  assert.strictEqual(guardedPred.shouldBet, false, 'Khi hiệu suất gần đây giảm sút và bật autoPaper, cược thật phải bị chặn 100%!');
   assert.strictEqual(guardedPred.isPaperTrading, true);
-  console.log('✅ TEST 3 ĐẠT: Tự động hạ xuống Paper Trading khi hiệu suất gần đây sút giảm, bảo toàn vốn 100%.\n');
+  console.log('✅ TEST 3 ĐẠT: Tự động hạ xuống Paper Trading khi bật bảo vệ vốn, hoặc giữ nguyên cược thật nếu người dùng muốn.\n');
 
   // --------------------------------------------------------------------------
   // TEST 4: ĐIỀU KIỆN 4 — CHẤM ĐIỂM BACCARAT CHUẨN (NET EV TRỪ 5% PHẾ BANKER)

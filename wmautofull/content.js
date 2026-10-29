@@ -318,6 +318,10 @@ class WMAutoHelper {
               <button type="button" class="wm-mode-btn" id="wm-mode-real-btn">🔴 Cược thật (Real Bet)</button>
             </div>
           </div>
+          <div style="margin: 4px 0 4px 2px; display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="wm-auto-paper-chk" style="accent-color:#38bdf8; cursor:pointer;">
+            <label for="wm-auto-paper-chk" style="font-size:10px; color:#94a3b8; cursor:pointer;">Tự động hạ Paper Trading khi chuỗi thua (Bảo vệ vốn)</label>
+          </div>
 
           <!-- Chế độ nhạy mô hình AI (Model Sensitivity Modes: Flash, Medium, Low, High, Ultra) -->
           <div class="wm-ai-mode-bar" style="margin-top: 6px; flex-wrap: wrap;">
@@ -590,6 +594,18 @@ class WMAutoHelper {
         if (this.aiEngine) {
           this.aiEngine.setTradingMode('REAL');
           this.addLog('⚠️ Đã chuyển sang chế độ: CƯỢC THẬT (Bot sẽ tự đặt tiền thật khi bấm Bắt đầu)', 'warning');
+        }
+      });
+    }
+
+    // Tự động hạ Paper Trading checkbox
+    const autoPaperChk = document.getElementById('wm-auto-paper-chk');
+    if (autoPaperChk) {
+      autoPaperChk.checked = this.aiEngine ? !!this.aiEngine.autoPaperTrading : false;
+      autoPaperChk.addEventListener('change', () => {
+        if (this.aiEngine) {
+          this.aiEngine.setAutoPaperTrading(autoPaperChk.checked);
+          this.addLog(`🛡️ Tự động hạ Paper khi chuỗi thua: ${autoPaperChk.checked ? 'ĐÃ BẬT' : 'ĐÃ TẮT (Ép cược thật)'}`, 'info');
         }
       });
     }
@@ -2766,10 +2782,15 @@ class WMAutoHelper {
     const riskEl = document.getElementById('wm-ai-risk-status');
     if (riskEl) {
       const status = stats.riskGuardStatus || (this.aiEngine?.isUnderperforming ? 'UNDERPERFORMING' : 'NORMAL');
+      const isAutoPaper = this.aiEngine ? this.aiEngine.autoPaperTrading : false;
       if (status === 'UNDERPERFORMING') {
-        riskEl.innerHTML = '<span style="color:#f59e0b; font-weight:600;">⚠️ Tự động hạ Paper (Hiệu suất giảm)</span>';
+        if (isAutoPaper) {
+          riskEl.innerHTML = '<span style="color:#f59e0b; font-weight:600;">⚠️ Tự động hạ Paper (Hiệu suất giảm)</span>';
+        } else {
+          riskEl.innerHTML = '<span style="color:#38bdf8; font-weight:600;">⚡ Cảnh báo: Hiệu suất giảm (Vẫn ép cược thật)</span>';
+        }
       } else if (status === 'STOP_LOSS') {
-        riskEl.innerHTML = '<span style="color:#ef4444; font-weight:bold;">🛑 Stop-Loss (Chuỗi thua chạm ngưỡng)</span>';
+        riskEl.innerHTML = isAutoPaper ? '<span style="color:#ef4444; font-weight:bold;">🛑 Stop-Loss (Chuỗi thua chạm ngưỡng)</span>' : '<span style="color:#f59e0b;">⚠️ Chuỗi thua cao (Vẫn ép cược thật)</span>';
       } else {
         riskEl.innerHTML = '<span style="color:#34d399; font-weight:600;">🟢 Bình thường (Đủ điều kiện cược)</span>';
       }

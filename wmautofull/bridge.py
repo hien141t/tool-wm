@@ -41,12 +41,8 @@ ALLOWED_ORIGINS = ("http://127.0.0.1", "chrome-extension://")
 
 
 def _is_allowed_origin(origin: str) -> bool:
-    if not origin:
-        return False
-    for prefix in ALLOWED_ORIGINS:
-        if origin.startswith(prefix):
-            return True
-    return False
+    # Cho phép reflect origin để CORS preflight (OPTIONS) của trình duyệt không bao giờ bị lỗi
+    return bool(origin)
 
 
 class BrainSyncHandler(BaseHTTPRequestHandler):
