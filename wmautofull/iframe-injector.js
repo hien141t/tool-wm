@@ -5,6 +5,7 @@
 
   const cachedTablesMap = new Map();
   let lastAutoScrollTime = 0;
+  const iframeBetCooldown = new Map(); // tableId -> timestamp chống click đúp (Debounce Mutex)
 
   function getTargetDoc() {
     const iframe109 = document.getElementById('iframe_109');
@@ -588,6 +589,22 @@
 
   function clickBetZone(tableId, bet, messageId, candidateIds = []) {
     try {
+      const now = Date.now();
+      const lastClick = iframeBetCooldown.get(tableId) || 0;
+      if (now - lastClick < 5000) {
+        window.parent.postMessage({
+          type: 'WM_IFRAME_RESPONSE',
+          action: 'CLICK_BET_ZONE',
+          messageId: messageId,
+          success: true,
+          tableId: tableId,
+          bet: bet,
+          skipped: true,
+          reason: 'DEBOUNCE_COOLDOWN'
+        }, '*');
+        return;
+      }
+
       const targetDocs = [getTargetDoc()];
       if (!targetDocs.includes(document)) targetDocs.push(document);
       const childIframes = Array.from(document.querySelectorAll('iframe'));
@@ -663,6 +680,7 @@
       }
 
       if (betArea) {
+        iframeBetCooldown.set(tableId, Date.now());
         try { betArea.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
         try {
           betArea.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
