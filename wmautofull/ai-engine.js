@@ -398,6 +398,7 @@
         streak: { correct: 0, total: 0, accuracy: 0.5 },
         table: { correct: 0, total: 0, accuracy: 0.5 }
       };
+      this.minConsensusMargin = 0.58;
     }
 
     updateModelPerformance(modelKey, wasCorrect) {
@@ -416,7 +417,7 @@
       // ==========================================================================
       // ĐIỀU KIỆN 2: CÁC MÔ HÌNH CÓ ĐỒNG THUẬN & BIÊN AN TOÀN (CONSENSUS & MARGIN)
       // ==========================================================================
-      const minConsensusMargin = 0.58; // Xác suất tối thiểu 58% mới đủ an toàn sau khi trừ phế
+      const minConsensusMargin = this.minConsensusMargin || 0.58; // Xác suất tối thiểu mới đủ an toàn sau khi trừ phế
 
       const validPredictions = [];
       const activeBets = [];
@@ -608,8 +609,61 @@
       // FIX 6: Trạng thái não AI ('EMPTY' | 'TRAINED')
       this.brainState = 'EMPTY';
 
+      // Cấu hình các chế độ lọc mô hình AI (Model Sensitivity Modes)
+      // Flash (≥3), Medium (≥5), Low (≥6), High (≥8 - Mặc định), Ultra (≥10)
+      this.filterModes = {
+        FLASH: {
+          name: 'Flash',
+          label: '⚡ Flash (≥3)',
+          markovMinSupport: 3,
+          streakMinSupport: 3,
+          tableMinSupport: 8,
+          minConsensusMargin: 0.55,
+          desc: 'Tần suất cược cao, bắt nhịp nhanh với mẫu ngắn ≥ 3 ván'
+        },
+        MEDIUM: {
+          name: 'Medium',
+          label: '⚖️ Medium (≥5)',
+          markovMinSupport: 5,
+          streakMinSupport: 4,
+          tableMinSupport: 10,
+          minConsensusMargin: 0.57,
+          desc: 'Cân bằng giữa tốc độ và độ an toàn, mẫu ≥ 5 ván'
+        },
+        LOW: {
+          name: 'Low',
+          label: '🛡️ Low (≥6)',
+          markovMinSupport: 6,
+          streakMinSupport: 5,
+          tableMinSupport: 12,
+          minConsensusMargin: 0.58,
+          desc: 'Tiêu chuẩn, giảm thiểu rủi ro, mẫu ≥ 6 ván'
+        },
+        HIGH: {
+          name: 'High',
+          label: '🎯 High (≥8)',
+          markovMinSupport: 8,
+          streakMinSupport: 6,
+          tableMinSupport: 15,
+          minConsensusMargin: 0.58,
+          desc: 'Kỷ luật cao, lọc tín hiệu chặt chẽ, mẫu ≥ 8 ván (Mặc định)'
+        },
+        ULTRA: {
+          name: 'Ultra',
+          label: '💎 Ultra (≥10)',
+          markovMinSupport: 10,
+          streakMinSupport: 8,
+          tableMinSupport: 20,
+          minConsensusMargin: 0.60,
+          desc: 'Bắn tỉa an toàn tuyệt đối, chỉ cược khi mẫu xuất hiện ≥ 10 ván'
+        }
+      };
+      this.currentFilterMode = 'HIGH';
+      const savedFilterMode = (typeof localStorage !== 'undefined' ? localStorage.getItem('wm_ai_filter_mode') : null) || 'HIGH';
+      this.setFilterMode(savedFilterMode, false);
+
       // Chế độ cược an toàn: 'PAPER' (Mặc định - chỉ mô phỏng & học) hoặc 'REAL' (cược tiền thật)
-      this.tradingMode = localStorage.getItem('wm_ai_trading_mode') || 'PAPER';
+      this.tradingMode = (typeof localStorage !== 'undefined' ? localStorage.getItem('wm_ai_trading_mode') : null) || 'PAPER';
       this.sessionId = 'session_' + Date.now();
       this.onStatsChange = null;
 
@@ -749,6 +803,7 @@
         version: 2,
         exportedAt: new Date().toISOString(),
         brainState: this.brainState,        // FIX 6: expose cho UI
+        filterMode: this.currentFilterMode,
         weights: this.ensemble.weights,
         markovCounts: this.markov.ngramCounts,
         streakStats: this.streak.streakStats,
@@ -779,6 +834,7 @@
 
     applyKnowledge(data) {
       if (!data || typeof data !== 'object') return false;
+      if (data.filterMode) this.setFilterMode(data.filterMode, false);
       if (data.weights) this.ensemble.weights = Object.assign(this.ensemble.weights, data.weights);
       if (data.markovCounts) this.markov.ngramCounts = Object.assign(this.markov.ngramCounts, data.markovCounts);
       if (data.streakStats) this.streak.streakStats = Object.assign(this.streak.streakStats, data.streakStats);
@@ -870,15 +926,37 @@
     setTradingMode(mode) {
       if (mode === 'PAPER' || mode === 'REAL') {
         this.tradingMode = mode;
-        localStorage.setItem('wm_ai_trading_mode', mode);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('wm_ai_trading_mode', mode);
+        }
         this.notifyStats();
       }
     }
 
+    setFilterMode(modeKey, persist = true) {
+      if (!this.filterModes) return;
+      const key = (modeKey && this.filterModes[modeKey]) ? modeKey : 'HIGH';
+      const mode = this.filterModes[key];
+      this.currentFilterMode = key;
+
+      if (this.markov) this.markov.minSupport = mode.markovMinSupport;
+      if (this.streak) this.streak.minSupport = mode.streakMinSupport;
+      if (this.tableLearner) this.tableLearner.minSupport = mode.tableMinSupport;
+      if (this.ensemble) this.ensemble.minConsensusMargin = mode.minConsensusMargin;
+
+      if (persist && typeof localStorage !== 'undefined') {
+        localStorage.setItem('wm_ai_filter_mode', key);
+      }
+      this.stats.filterMode = key;
+      this.stats.filterModeLabel = mode.label;
+      this.notifyStats();
+    }
+
     notifyStats() {
       this.stats.patternsLearnedCount = Object.keys(this.markov.ngramCounts).length + Object.keys(this.streak.streakStats).length;
+      this.stats.filterMode = this.currentFilterMode;
       if (typeof this.onStatsChange === 'function') {
-        this.onStatsChange(this.stats, this.tradingMode, this.bridgeConnected);
+        this.onStatsChange(this.stats, this.tradingMode, this.bridgeConnected, this.currentFilterMode);
       }
     }
 

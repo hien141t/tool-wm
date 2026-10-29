@@ -319,6 +319,18 @@ class WMAutoHelper {
             </div>
           </div>
 
+          <!-- Chế độ nhạy mô hình AI (Model Sensitivity Modes: Flash, Medium, Low, High, Ultra) -->
+          <div class="wm-ai-mode-bar" style="margin-top: 6px; flex-wrap: wrap;">
+            <span style="font-size:11px; color:#94a3b8; font-weight:600;">Độ nhạy AI:</span>
+            <div class="wm-ai-filter-toggle">
+              <button type="button" class="wm-filter-btn" data-mode="FLASH" title="Flash: Đánh nhanh, mẫu xuất hiện ≥3 lần">⚡ Flash (≥3)</button>
+              <button type="button" class="wm-filter-btn" data-mode="MEDIUM" title="Medium: Cân bằng nhịp, mẫu ≥5 lần">⚖️ Med (≥5)</button>
+              <button type="button" class="wm-filter-btn" data-mode="LOW" title="Low: Tiêu chuẩn an toàn, mẫu ≥6 lần">🛡️ Low (≥6)</button>
+              <button type="button" class="wm-filter-btn active" data-mode="HIGH" title="High: Kỷ luật cao, mẫu ≥8 lần (Khuyên dùng)">🎯 High (≥8)</button>
+              <button type="button" class="wm-filter-btn" data-mode="ULTRA" title="Ultra: Bắn tỉa an toàn tuyệt đối, mẫu ≥10 lần">💎 Ultra (≥10)</button>
+            </div>
+          </div>
+
           <!-- Thống kê AI thời gian thực -->
           <div class="wm-ai-stats-grid">
             <div class="wm-ai-stat-box">
@@ -581,6 +593,21 @@ class WMAutoHelper {
         }
       });
     }
+
+    // Chế độ nhạy mô hình AI (Filter Mode: FLASH, MEDIUM, LOW, HIGH, ULTRA)
+    const filterBtns = document.querySelectorAll('.wm-filter-btn');
+    filterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-mode');
+        if (this.aiEngine && mode) {
+          this.aiEngine.setFilterMode(mode);
+          filterBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const label = btn.textContent.trim();
+          this.addLog(`🎯 Đã đổi chế độ mô hình AI sang: ${label}`, 'info');
+        }
+      });
+    });
 
     // Xuất bộ não AI thành file JSON
     const exportAiBtn = document.getElementById('wm-ai-export-btn');
@@ -2653,6 +2680,16 @@ class WMAutoHelper {
         realBtn.classList.remove('active');
       }
     }
+
+    // Cập nhật trạng thái nút lọc độ nhạy AI (Filter Mode)
+    const currentFilter = stats.filterMode || this.aiEngine?.currentFilterMode || 'HIGH';
+    document.querySelectorAll('.wm-filter-btn').forEach(btn => {
+      if (btn.getAttribute('data-mode') === currentFilter) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
 
     // 2. Thống kê 4 ô
     const totalEl = document.getElementById('wm-ai-total-rounds');
