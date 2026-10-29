@@ -163,11 +163,8 @@ async function runGatingTests() {
   }
 
   console.log(`Chuỗi thua hiện tại: ${engine.currentLossStreak} ván`);
-  console.log(`Trạng thái Underperforming: ${engine.isUnderperforming}`);
-  console.log(`Lý do hạ Paper Trading: "${engine.underperformReason}"`);
-  assert(engine.isUnderperforming === true || engine.currentLossStreak >= 3, 'Phải kích hoạt bảo vệ rủi ro khi chuỗi thua >= 3');
+  assert(engine.currentLossStreak >= 3, 'Chuỗi thua >= 3');
 
-  // Khi đang underperforming, ngay cả khi người dùng bật REAL và có dự đoán B, AI vẫn hạ xuống Paper Trading:
   // Giả lập 1 dự đoán mạnh 'B'
   engine.markov.predict = () => ({
     model: 'Markov', key: 'markov', predicted: 'B', probB: 0.70, probP: 0.30, confidence: 0.40, support: 20, rationale: 'Test mạnh'
@@ -176,21 +173,21 @@ async function runGatingTests() {
     model: 'Streak', key: 'streak', predicted: 'B', probB: 0.65, probP: 0.35, confidence: 0.30, support: 15, rationale: 'Test mạnh'
   });
 
-  // Test 3A: Khi người dùng KHÔNG bật autoPaperTrading (mặc định), bot vẫn cho phép cược thật (không tự ý huỷ cược thật)
-  engine.setAutoPaperTrading(false);
+  // Test 3A: Người dùng chọn CƯỢC THẬT (REAL) -> Bắt buộc cược thật 100%, không bị hạ Paper dù chuỗi thua
+  engine.setTradingMode('REAL');
   const realPred = engine.generatePrediction('test_guarded_tbl', 'Table Guard', ['P', 'P', 'P', 'P']);
-  assert.strictEqual(realPred.shouldBet, true, 'Khi autoPaperTrading tắt, bot phải tôn trọng lệnh cược thật của người dùng!');
+  console.log(`Dự đoán sinh ra: ${realPred.predicted}`);
+  console.log(`Cho phép cược thật (shouldBet): ${realPred.shouldBet}`);
+  console.log(`Chế độ Paper Trading: ${realPred.isPaperTrading}`);
+  assert.strictEqual(realPred.shouldBet, true, 'Khi người dùng chọn REAL, AI luôn cược thật 100%, không bị hạ Paper!');
   assert.strictEqual(realPred.isPaperTrading, false);
 
-  // Test 3B: Khi người dùng BẬT autoPaperTrading, bot tự động hạ xuống Paper Trading khi hiệu suất sụt giảm
-  engine.setAutoPaperTrading(true);
-  const guardedPred = engine.generatePrediction('test_guarded_tbl', 'Table Guard', ['P', 'P', 'P', 'P']);
-  console.log(`Dự đoán sinh ra: ${guardedPred.predicted}`);
-  console.log(`Cho phép cược thật (shouldBet): ${guardedPred.shouldBet}`);
-  console.log(`Chế độ Paper Trading: ${guardedPred.isPaperTrading} | Lý do: "${guardedPred.paperTradingReason}"`);
-  assert.strictEqual(guardedPred.shouldBet, false, 'Khi hiệu suất gần đây giảm sút và bật autoPaper, cược thật phải bị chặn 100%!');
-  assert.strictEqual(guardedPred.isPaperTrading, true);
-  console.log('✅ TEST 3 ĐẠT: Tự động hạ xuống Paper Trading khi bật bảo vệ vốn, hoặc giữ nguyên cược thật nếu người dùng muốn.\n');
+  // Test 3B: Người dùng chọn PAPER TRADING -> Mô phỏng an toàn
+  engine.setTradingMode('PAPER');
+  const paperPred = engine.generatePrediction('test_guarded_tbl', 'Table Guard', ['P', 'P', 'P', 'P']);
+  assert.strictEqual(paperPred.shouldBet, false, 'Khi người dùng chọn PAPER, AI cược mô phỏng!');
+  assert.strictEqual(paperPred.isPaperTrading, true);
+  console.log('✅ TEST 3 ĐẠT: Đã loại bỏ hoàn toàn cơ chế tự động hạ Paper. Lệnh Cược thật (Real Bet) luôn được thực thi 100%!\n');
 
   // --------------------------------------------------------------------------
   // TEST 4: ĐIỀU KIỆN 4 — CHẤM ĐIỂM BACCARAT CHUẨN (NET EV TRỪ 5% PHẾ BANKER)

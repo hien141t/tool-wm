@@ -856,10 +856,9 @@
         this.totalPassCount = this.stats.totalPassCount || 0;
         this.currentLossStreak = this.stats.currentLossStreak || 0;
         this.maxLossStreak = this.stats.maxLossStreak || 0;
-        if (this.stats.riskGuardStatus === 'UNDERPERFORMING') {
-          this.isUnderperforming = true;
-          this.underperformReason = 'Khôi phục từ phiên trước: Hiệu suất gần đây yếu';
-        }
+        this.isUnderperforming = false;
+        this.underperformReason = '';
+        this.stats.riskGuardStatus = 'NORMAL';
       }
       // FIX 6: đánh dấu não đã được nạp dữ liệu thật
       const hasRealData = (this.stats.totalRoundsObserved || 0) > 0
@@ -1076,23 +1075,10 @@
           this.stats.currentLossStreak = this.currentLossStreak;
           this.stats.maxLossStreak = this.maxLossStreak;
 
-          // ĐIỀU KIỆN 3: KIỂM TRA HIỆU SUẤT GẦN ĐÂY
-          // Nếu đã có từ 8 ván trong cửa sổ và:
-          // 1. Tỷ lệ thắng cửa sổ < 48% (hiệu suất rơi xuống dưới mức nền), HOẶC
-          // 2. Chuỗi thua liên tiếp >= 3 ván:
-          // -> TỰ ĐỘNG HẠ XUỐNG DYNAMIC PAPER TRADING
-          if (this.rollingWindow.length >= 8) {
-            if (rollingAcc < 0.48 || this.currentLossStreak >= 3) {
-              this.isUnderperforming = true;
-              this.underperformReason = `Hiệu suất 20 ván gần nhất sụt giảm (${(rollingAcc * 100).toFixed(0)}%) hoặc chuỗi thua ${this.currentLossStreak} ván`;
-              this.stats.riskGuardStatus = 'UNDERPERFORMING';
-            } else if (rollingAcc >= 0.55 && this.currentLossStreak === 0) {
-              // Hồi phục: Rolling Acc >= 55% và không còn trong chuỗi thua
-              this.isUnderperforming = false;
-              this.underperformReason = '';
-              this.stats.riskGuardStatus = 'NORMAL';
-            }
-          }
+          // Cập nhật trạng thái thống kê (đã bỏ cơ chế tự động hạ Paper)
+          this.stats.riskGuardStatus = 'NORMAL';
+          this.isUnderperforming = false;
+          this.underperformReason = '';
         }
 
         // Cập nhật trọng số thích ứng cho từng mô hình con (Online Adaptive Weighting)
@@ -1220,7 +1206,7 @@
         this.db.savePrediction(predictionRecord);
       }
 
-      // ĐIỀU KIỆN 3 & 4: KIỂM TRA HIỆU SUẤT GẦN ĐÂY & KIỂM SOÁT RỦI RO
+      // KIỂM TRA CHẾ ĐỘ CƯỢC: REAL hay PAPER (Đã bỏ hoàn toàn cơ chế tự động hạ Paper)
       const isConfident = (combined.predicted === 'B' || combined.predicted === 'P');
       let allowRealExecution = false;
       let paperReason = '';
@@ -1228,20 +1214,13 @@
       if (!isConfident) {
         allowRealExecution = false;
         paperReason = combined.rationale;
-      } else if (this.tradingMode !== 'REAL') {
+      } else if (this.tradingMode === 'REAL') {
+        // Người dùng chọn CƯỢC THẬT (REAL) -> Luôn cược thật 100%!
+        allowRealExecution = true;
+      } else {
+        // Người dùng chọn PAPER -> Mô phỏng an toàn
         allowRealExecution = false;
         paperReason = 'Đang ở chế độ Paper Trading (Mô phỏng an toàn)';
-      } else if (this.autoPaperTrading && this.isUnderperforming) {
-        // Chỉ tự động hạ Paper nếu người dùng bật tùy chọn bảo vệ này
-        allowRealExecution = false;
-        paperReason = `Hạ mức cược: ${this.underperformReason}`;
-      } else if (this.autoPaperTrading && this.currentLossStreak >= 4) {
-        // Kích hoạt Stop-Loss khi chuỗi thua dài
-        allowRealExecution = false;
-        paperReason = `Kích hoạt Stop-Loss: Chuỗi thua chạm mốc ${this.currentLossStreak} ván`;
-      } else {
-        // Người dùng chọn REAL BET -> Cược thật 100%!
-        allowRealExecution = true;
       }
 
       return {
