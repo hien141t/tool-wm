@@ -1391,9 +1391,6 @@ class WMAutoHelper {
 
     if (!this.parsePatterns()) return;
 
-    // Tự động đảm bảo chọn đúng chip trên bàn game khi bắt đầu cược
-    this.selectGameChip(this.selectedChip);
-
     this.isRunning = true;
     document.getElementById('wm-start-btn').disabled = true;
     document.getElementById('wm-stop-btn').disabled = false;
@@ -1501,18 +1498,27 @@ class WMAutoHelper {
   selectGameChip(chipValue) {
     const chipStr = String(chipValue);
     try {
-      const iframes = document.querySelectorAll('iframe');
-      if (iframes.length > 0) {
-        iframes.forEach((ifr) => {
-          try {
-            ifr.contentWindow?.postMessage({
-              action: 'SELECT_CHIP',
-              chip: chipStr,
-              messageId: ++this.messageIdCounter
-            }, '*');
-          } catch (e) {}
-        });
-      }
+      const allIframes = Array.from(document.querySelectorAll('iframe'));
+      // Chỉ gửi tới các iframe đang hiển thị thực tế (bỏ qua iframe display: none, width/height = 0)
+      const visibleIframes = allIframes.filter((ifr) => {
+        try {
+          const style = window.getComputedStyle(ifr);
+          return style.display !== 'none' && style.visibility !== 'hidden' && ifr.offsetWidth > 0 && ifr.offsetHeight > 0;
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const targets = visibleIframes.length > 0 ? visibleIframes : allIframes;
+      targets.forEach((ifr) => {
+        try {
+          ifr.contentWindow?.postMessage({
+            action: 'SELECT_CHIP',
+            chip: chipStr,
+            messageId: ++this.messageIdCounter
+          }, '*');
+        } catch (e) {}
+      });
     } catch (e) {}
     return true;
   }
@@ -1597,9 +1603,10 @@ class WMAutoHelper {
   async executeBet(table, pattern) {
     const betTarget = pattern.bet;
     const betTargetName = betTarget === 'B' ? 'Banker' : 'Player';
-    const amount = this.selectedChip * this.totalBets;
+    const currentChip = this.actualGameChip || this.selectedChip;
+    const amount = currentChip * this.totalBets;
 
-    this.addLog(`Đang cược ${this.totalBets}x chip ${this.selectedChip} vào ${betTargetName} (${table.name || table.id})...`, 'info');
+    this.addLog(`Đang cược ${this.totalBets}x chip ${currentChip} vào ${betTargetName} (${table.name || table.id})...`, 'info');
 
     let betSuccess = false;
 
@@ -1645,7 +1652,7 @@ class WMAutoHelper {
       table: table.name || table.id,
       tableId: table.id,
       bet: betTarget,
-      chip: this.selectedChip,
+      chip: currentChip,
       totalBets: this.totalBets,
       amount: amount,
       pattern: `${pattern.condition}=${pattern.bet}`,
@@ -1881,7 +1888,10 @@ class WMAutoHelper {
       // Nhận phản hồi chọn Chip từ iframe-injector
       if (data.type === 'WM_IFRAME_RESPONSE' && data.action === 'SELECT_CHIP') {
         if (data.success) {
+          this.actualGameChip = parseInt(data.chip) || this.selectedChip;
           this.addLog(`🎯 Đã chọn Chip ${data.chip} trên bàn game thành công!`, 'success');
+        } else if (data.error) {
+          this.addLog(`⚠️ [Chọn Chip] ${data.error}`, 'warning');
         }
       }
 

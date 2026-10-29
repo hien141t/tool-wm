@@ -594,11 +594,12 @@
 
   // ==========================================================================
   // HỆ THỐNG CHỌN & XÁC MINH CHIP ĐA TẦNG (MULTI-LAYER VERIFIED CHIP SELECTOR)
-  // Giải quyết triệt để 4 lỗi:
-  // - Lỗi 1: Xác minh trạng thái active thực tế sau click
-  // - Lỗi 2: Chỉ chọn phần tử hiển thị hợp lệ (loại bỏ phần tử ẩn/clone/template)
-  // - Lỗi 3: Xử lý tập trung trong iframe sảnh game
-  // - Lỗi 4: Phát hiện mệnh giá chip đang thực sự active trên game
+  // Thực hiện đúng 5 nguyên tắc:
+  // 1. Chỉ phát 1 lần click thật (không dispatch mousedown, mouseup kép)
+  // 2. Không quét đệ quy các iframe con
+  // 3. Bỏ qua nếu iframe hiện tại đang ẩn (display: none, width=0)
+  // 4. Sau khi click, kiểm tra class 'on' trên phần tử chip
+  // 5. Nếu chưa active thì báo lỗi, tuyệt đối không click lặp lại
   // ==========================================================================
   function isVisibleAndInteractable(el) {
     if (!el || !el.getBoundingClientRect) return false;
@@ -614,19 +615,30 @@
     }
   }
 
-  function findValidVisibleChip(doc, chipStr) {
-    if (!doc) return null;
+  function getChipVariants(chipStr) {
     const variants = [chipStr];
+    if (chipStr === '1') variants.push('01');
+    if (chipStr === '5') variants.push('05');
     if (chipStr === '1000') variants.push('1k', '1K');
     if (chipStr === '5000') variants.push('5k', '5K');
     if (chipStr === '10000') variants.push('10k', '10K');
     if (chipStr === '20000') variants.push('20k', '20K');
     if (chipStr === '50000') variants.push('50k', '50K');
+    return variants;
+  }
 
-    // 1. ƯU TIÊN SỐ 1 TUYỆT ĐỐI: Khung chuẩn của WM: #mult_chips_box hoặc .chip_box
+  function findValidVisibleChip(doc, chipStr) {
+    if (!doc) return null;
+    const variants = getChipVariants(chipStr);
+
+    // 1. ƯU TIÊN SỐ 1: Khung chuẩn WM: #mult_chips_box (lobby đa bàn) hoặc #chip_box (bàn đơn)
     try {
-      const box = doc.getElementById('mult_chips_box') || doc.querySelector('.chip_box');
+      const box = doc.getElementById('mult_chips_box') || doc.getElementById('chip_box') || doc.querySelector('.chip_box');
       if (box) {
+        for (const val of variants) {
+          const chip = box.querySelector(`[name="${val}"], .chip_b_${val}`);
+          if (chip && isVisibleAndInteractable(chip)) return chip;
+        }
         for (const val of variants) {
           const chip = box.querySelector(`[name="${val}"], .chip_b_${val}`);
           if (chip) return chip;
@@ -634,18 +646,18 @@
       }
     } catch (e) {}
 
-    // 2. XPath chuẩn người dùng cung cấp: (//div[@name='${val}'])[1]
+    // 2. XPath chuẩn: (//div[@name='${val}'])[1]
     for (const val of variants) {
       try {
         const xpath = `(//div[@name='${val}'])[1]`;
         const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-        if (res && res.singleNodeValue) return res.singleNodeValue;
+        if (res && res.singleNodeValue && isVisibleAndInteractable(res.singleNodeValue)) return res.singleNodeValue;
       } catch (e) {}
 
       try {
         const xpath = `(//*[@name='${val}'])[1]`;
         const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-        if (res && res.singleNodeValue) return res.singleNodeValue;
+        if (res && res.singleNodeValue && isVisibleAndInteractable(res.singleNodeValue)) return res.singleNodeValue;
       } catch (e) {}
     }
 
@@ -653,56 +665,115 @@
     for (const val of variants) {
       try {
         const el = doc.querySelector(`.chip_item[name="${val}"], div[name="${val}"], [name="${val}"], .chip_b_${val}`);
-        if (el) return el;
+        if (el && isVisibleAndInteractable(el)) return el;
       } catch (e) {}
     }
-
-    // 4. Quét các iframe con nếu có
-    try {
-      const iframes = doc.querySelectorAll('iframe');
-      for (const ifr of iframes) {
-        try {
-          const subDoc = ifr.contentDocument || ifr.contentWindow?.document;
-          const found = findValidVisibleChip(subDoc, chipStr);
-          if (found) return found;
-        } catch (e) {}
-      }
-    } catch (e) {}
 
     return null;
   }
 
+  function checkChipActive(doc, chipStr) {
+    if (!doc) return false;
+    const box = doc.getElementById('mult_chips_box') || doc.getElementById('chip_box') || doc.querySelector('.chip_box');
+    if (!box) return false;
+
+    const activeChip = box.querySelector('.chip_item.on, .on');
+    if (!activeChip) return false;
+
+    // 1. Kiểm tra qua attribute name (chế độ lobby #mult_chips_box)
+    const nameVal = activeChip.getAttribute('name');
+    if (nameVal && String(nameVal) === chipStr) return true;
+
+    // 2. Kiểm tra qua class chip_b_ (chế độ bàn chơi #chip_box)
+    const variants = getChipVariants(chipStr);
+    for (const v of variants) {
+      if (activeChip.classList.contains(`chip_b_${v}`)) return true;
+    }
+
+    // 3. Kiểm tra qua dataset
+    if (activeChip.dataset && (activeChip.dataset.value === chipStr || activeChip.dataset.chip === chipStr)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function simulateRealClick(el) {
+    if (!el) return;
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    } catch (e) {}
+
+    // Chỉ phát đúng 1 lần click thật, không gọi cả mousedown, mouseup liên tiếp
+    try {
+      el.click();
+    } catch (e) {
+      try {
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      } catch (err) {}
+    }
+  }
+
   function selectChip(chipValue, messageId) {
     try {
+      // 1. Nếu iframe hiện tại đang ẩn (display: none, width=0), bỏ qua không xử lý
+      if (window.frameElement) {
+        try {
+          const style = window.parent.getComputedStyle(window.frameElement);
+          if (style.display === 'none' || style.visibility === 'hidden' || window.frameElement.offsetWidth === 0) {
+            return false;
+          }
+        } catch (e) {}
+      }
+
       const chipStr = String(chipValue);
-      const doc = getTargetDoc();
-      let chipEl = findValidVisibleChip(doc, chipStr);
+      const doc = document;
+      const chipEl = findValidVisibleChip(doc, chipStr);
 
-      if (!chipEl && doc !== document) {
-        chipEl = findValidVisibleChip(document, chipStr);
+      if (!chipEl) {
+        // Chỉ thông báo lỗi nếu iframe này có chứa thanh chip
+        const hasBox = doc.getElementById('mult_chips_box') || doc.getElementById('chip_box') || doc.querySelector('.chip_box');
+        if (hasBox) {
+          window.parent.postMessage({
+            type: 'WM_IFRAME_RESPONSE',
+            messageId: messageId,
+            action: 'SELECT_CHIP',
+            success: false,
+            chip: chipStr,
+            error: `Không tìm thấy chip ${chipStr} trên thanh chọn`
+          }, '*');
+        }
+        return false;
       }
 
-      if (chipEl) {
-        simulateRealClick(chipEl);
-        window.parent.postMessage({
-          type: 'WM_IFRAME_RESPONSE',
-          messageId: messageId,
-          action: 'SELECT_CHIP',
-          success: true,
-          chip: chipStr
-        }, '*');
-        return true;
-      }
+      // 2. Phát đúng một lần click thật lên phần tử chip
+      simulateRealClick(chipEl);
 
-      window.parent.postMessage({
-        type: 'WM_IFRAME_RESPONSE',
-        messageId: messageId,
-        action: 'SELECT_CHIP',
-        success: false,
-        chip: chipStr,
-        error: 'Chip element not found'
-      }, '*');
-      return false;
+      // 3. Chờ game xử lý click rồi kiểm tra trạng thái active (class on)
+      setTimeout(() => {
+        const isActive = checkChipActive(doc, chipStr);
+        if (isActive) {
+          window.parent.postMessage({
+            type: 'WM_IFRAME_RESPONSE',
+            messageId: messageId,
+            action: 'SELECT_CHIP',
+            success: true,
+            chip: chipStr
+          }, '*');
+        } else {
+          // Báo lỗi chip chưa active, tuyệt đối KHÔNG tự click lặp vô hạn
+          window.parent.postMessage({
+            type: 'WM_IFRAME_RESPONSE',
+            messageId: messageId,
+            action: 'SELECT_CHIP',
+            success: false,
+            chip: chipStr,
+            error: `Chip ${chipStr} chưa nhận trạng thái active (chưa có class 'on')`
+          }, '*');
+        }
+      }, 180);
+
+      return true;
     } catch (err) {
       window.parent.postMessage({
         type: 'WM_IFRAME_RESPONSE',
@@ -713,21 +784,6 @@
         error: err.message
       }, '*');
       return false;
-    }
-  }
-
-  function simulateRealClick(el) {
-    if (!el) return;
-    try {
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    } catch (e) {}
-
-    try {
-      el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-      el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-      el.click();
-    } catch (e) {
-      try { el.click(); } catch (err) {}
     }
   }
 
