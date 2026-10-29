@@ -1809,6 +1809,23 @@ class WMAutoHelper {
 
     if (!this.parsePatterns()) return;
 
+    // Tự động giải phóng các lệnh PENDING cũ (>60s) để tránh kẹt giới hạn cược đồng thời
+    const now = Date.now();
+    let cleanedPending = 0;
+    this.betHistory.forEach(item => {
+      if (item.result === 'PENDING' && (now - (item.timestamp || 0) > 60000)) {
+        item.result = 'TIMEOUT';
+        item.profit = 0;
+        cleanedPending++;
+      }
+    });
+    if (cleanedPending > 0) {
+      this.recalculateStats();
+      this.saveBetHistory();
+      this.renderBetHistory();
+      this.addLog(`🧹 Đã giải phóng ${cleanedPending} lệnh cược chờ cũ để sẵn sàng cược mới.`, 'info');
+    }
+
     this.isRunning = true;
     document.getElementById('wm-start-btn').disabled = true;
     document.getElementById('wm-stop-btn').disabled = false;
@@ -1844,7 +1861,12 @@ class WMAutoHelper {
     }
 
     // Ràng buộc cược đồng thời: nếu đã đủ số lệnh chờ kết quả, tạm ngưng cược thêm để đợi kết quả
-    if (this.maxConcurrentBets > 0 && this.getPendingBetsCount() >= this.maxConcurrentBets) {
+    const currentPending = this.getPendingBetsCount();
+    if (this.maxConcurrentBets > 0 && currentPending >= this.maxConcurrentBets) {
+      if (!this._lastConcurrentNotice || Date.now() - this._lastConcurrentNotice > 8000) {
+        this._lastConcurrentNotice = Date.now();
+        this.addLog(`⏳ [ĐẦY LỆNH ĐỒNG THỜI] Đang chờ ${currentPending}/${this.maxConcurrentBets} bàn có kết quả...`, 'warning');
+      }
       return;
     }
 
@@ -1887,25 +1909,26 @@ class WMAutoHelper {
       state.betPlaced = false;
     }
 
+    const now = Date.now();
+
     // LỚP 2: Chống cược trùng lặp (Pending Bet Check)
-    // Nếu bàn này đang có 1 lệnh cược ở trạng thái PENDING chưa có kết quả -> Tuyệt đối không cược thêm!
+    // Nếu bàn này đang có 1 lệnh cược ở trạng thái PENDING chưa có kết quả (và chưa quá 60s) -> Không cược thêm
     const hasPendingBet = this.betHistory.some(
-      item => item.tableId === tableId && item.result === 'PENDING'
+      item => item.tableId === tableId && item.result === 'PENDING' && (!item.timestamp || (now - item.timestamp < 60000))
     );
     if (hasPendingBet) {
       return;
     }
 
     // LỚP 3: Cooldown an toàn giữa 2 lần cược trên cùng bàn (tối thiểu 10 giây)
-    const now = Date.now();
     if (state.lastBetTimestamp && (now - state.lastBetTimestamp < 10000)) {
       return;
     }
 
     // LỚP 4: KIỂM TRA CHẶT CHẼ THỜI GIAN ĐẶT CƯỢC (BETTING TIME):
-    // - Chỉ cược khi thời gian đếm ngược còn từ 6s đến 25s (tránh bị trễ nhịp hoặc sàn khóa cược).
-    // - TUYỆT ĐỐI BỎ QUA khi betTime < 6s hoặc betTime === 0 (bàn đang chia bài / chưa mở cược).
-    const isBetTimeValid = (typeof betTime === 'number' && betTime >= 6 && betTime <= 25);
+    // - Chỉ cược khi thời gian đếm ngược còn từ 4s đến 45s (bao quát toàn bộ nhịp cược hợp lệ).
+    // - TUYỆT ĐỐI BỎ QUA khi betTime < 4s hoặc betTime === 0 (bàn đang chia bài / chưa mở cược).
+    const isBetTimeValid = (typeof betTime === 'number' && betTime >= 4 && betTime <= 45);
     const canBet = isBetTimeValid && !state.betPlaced;
 
     if (canBet && this.aiEngine) {
@@ -2377,10 +2400,19 @@ class WMAutoHelper {
   // ==========================================================================
   checkPendingBetResults() {
     let hasChanges = false;
+    const now = Date.now();
 
     this.betHistory.forEach(item => {
       // Chỉ xét các lệnh đang đợi kết quả
       if (item.result !== 'PENDING' || !item.success) return;
+
+      // Quá 60 giây không có kết quả -> tự động giải phóng slot (TIMEOUT)
+      if (now - (item.timestamp || 0) > 60000) {
+        item.result = 'TIMEOUT';
+        item.profit = 0;
+        hasChanges = true;
+        return;
+      }
 
       const table = this.tablesMap.get(item.tableId);
       if (!table || !table.history || table.history.length === 0) return;
@@ -2388,12 +2420,6 @@ class WMAutoHelper {
       const currentSig = table.history.join('');
       // Nếu chuỗi cầu chưa thay đổi gì so với lúc đặt cược -> ván chưa có kết quả
       if (currentSig === item.historySigAtBet) {
-        // Quá 3 phút không có kết quả -> đánh dấu Hết giờ
-        if (Date.now() - item.timestamp > 180000) {
-          item.result = 'TIMEOUT';
-          item.profit = 0;
-          hasChanges = true;
-        }
         return;
       }
 
@@ -2436,9 +2462,10 @@ class WMAutoHelper {
   }
 
   getPendingBetsCount() {
+    const now = Date.now();
     const pendingTableIds = new Set(
       this.betHistory
-        .filter(item => item.result === 'PENDING' && item.success !== false)
+        .filter(item => item.result === 'PENDING' && item.success !== false && (!item.timestamp || (now - item.timestamp < 60000)))
         .map(item => item.tableId)
     );
     for (const tid of this.activeBettingTables) {
