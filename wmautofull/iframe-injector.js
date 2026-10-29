@@ -448,10 +448,30 @@
               const cleanId = txt.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
               const history = extractRoadHistory(foundCard);
 
+              let betTime = 0;
+              const timeEl = foundCard.querySelector('.time, .bet-time, .count-down, [class*="time"], [class*="countdown"], [class*="second"]');
+              if (timeEl) {
+                const m = (timeEl.innerText || timeEl.textContent || '').match(/(\d{1,2})\s*s?/i);
+                if (m) betTime = parseInt(m[1]);
+              }
+              if (!betTime) {
+                const timeMatch = (foundCard.innerText || '').match(/\b(\d{1,2})\s*s\b/i);
+                if (timeMatch) betTime = parseInt(timeMatch[1]);
+              }
+              if (!betTime) {
+                const dataTime = foundCard.getAttribute('data-bettime') || foundCard.getAttribute('data-time');
+                if (dataTime) betTime = parseInt(dataTime);
+              }
+
+              // Nếu đang đóng cược / chia bài thì betTime = 0
+              if (/(ngừng cược|no more bet|đang chia|chờ ván mới|dealing|settle)/i.test(foundCard.innerText || '')) {
+                betTime = 0;
+              }
+
               cachedTablesMap.set(cleanId, {
                 id: cleanId,
                 name: txt,
-                betTime: 0,
+                betTime: betTime,
                 history: history
               });
             }

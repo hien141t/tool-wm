@@ -30,6 +30,8 @@ class WMAutoHelper {
     // Trạng thái bàn & Thống kê
     this.tablesMap = new Map();
     this.tableStates = {}; // Lưu round hiện tại đã cược chưa
+    this.activeBettingTables = new Set(); // Khóa Mutex chống cược trùng bàn khi đang thực thi (In-flight Mutex)
+    this.isEvaluatingAllTables = false;   // Khóa vòng lặp chống đè cược lặp lại (Loop Mutex)
     this.betHistory = [];
     this.stats = {
       totalBets: 0,
@@ -1163,12 +1165,23 @@ class WMAutoHelper {
 
     // 2. Tìm thời gian đếm ngược (betTime)
     let betTime = 0;
-    const timeMatch = (cardNode.innerText || '').match(/\b(\d{1,2})\s*s\b/i);
-    if (timeMatch) {
-      betTime = parseInt(timeMatch[1]);
-    } else {
-      const dataTime = cardNode.getAttribute('data-bettime');
+    const timeEl = cardNode.querySelector('.time, .bet-time, .count-down, [class*="time"], [class*="countdown"], [class*="second"]');
+    if (timeEl) {
+      const m = (timeEl.innerText || timeEl.textContent || '').match(/(\d{1,2})\s*s?/i);
+      if (m) betTime = parseInt(m[1]);
+    }
+    if (!betTime) {
+      const timeMatch = (cardNode.innerText || '').match(/\b(\d{1,2})\s*s\b/i);
+      if (timeMatch) betTime = parseInt(timeMatch[1]);
+    }
+    if (!betTime) {
+      const dataTime = cardNode.getAttribute('data-bettime') || cardNode.getAttribute('data-time');
       if (dataTime) betTime = parseInt(dataTime);
+    }
+
+    // Nếu đang đóng cược / chia bài / chờ ván mới thì betTime = 0
+    if (/(ngừng cược|no more bet|đang chia|chờ ván mới|dealing|settle)/i.test(cardNode.innerText || '')) {
+      betTime = 0;
     }
 
     // 3. Lấy lịch sử cầu đa tầng
@@ -1542,12 +1555,17 @@ class WMAutoHelper {
 
   async evaluateAllTablesForBetting() {
     if (!this.isRunning) return;
+    if (this.isEvaluatingAllTables) return;
 
-    const tables = Array.from(this.tablesMap.values()).slice(0, this.maxTables);
-
-    for (const table of tables) {
-      if (!this.isRunning) break;
-      await this.evaluateSingleTable(table);
+    this.isEvaluatingAllTables = true;
+    try {
+      const tables = Array.from(this.tablesMap.values()).slice(0, this.maxTables);
+      for (const table of tables) {
+        if (!this.isRunning) break;
+        await this.evaluateSingleTable(table);
+      }
+    } finally {
+      this.isEvaluatingAllTables = false;
     }
   }
 
@@ -1558,23 +1576,54 @@ class WMAutoHelper {
 
     if (!history || history.length < 2) return;
 
-    const state = this.tableStates[tableId] || { lastHistorySignature: '', betPlaced: false };
-    const currentSignature = history.join('');
-
-    if (currentSignature !== state.lastHistorySignature) {
-      state.lastHistorySignature = currentSignature;
-      state.betPlaced = false; // Ván mới đã ra kết quả -> sẵn sàng nhận định vòng tiếp theo
+    // LỚP 1: Chống cược đè khi đang thực thi trên cùng bàn này (In-flight Mutex)
+    if (this.activeBettingTables.has(tableId)) {
+      return;
     }
 
-    // Thời gian cược hợp lệ: từ 5s đến 25s (hoặc nếu betTime = 0 thì dựa vào trạng thái mở)
-    const canBet = (betTime === 0 || (betTime >= 5 && betTime <= 25)) && !state.betPlaced;
+    const state = this.tableStates[tableId] || {
+      lastHistorySignature: '',
+      betPlaced: false,
+      lastBetTimestamp: 0
+    };
+    const currentSignature = history.join('');
+
+    // Nếu ván mới đã kết thúc (chuỗi lịch sử có thêm kết quả mới) -> Mở lại quyền cược ván tiếp theo
+    if (currentSignature !== state.lastHistorySignature) {
+      state.lastHistorySignature = currentSignature;
+      state.betPlaced = false;
+    }
+
+    // LỚP 2: Chống cược trùng lặp (Pending Bet Check)
+    // Nếu bàn này đang có 1 lệnh cược ở trạng thái PENDING chưa có kết quả -> Tuyệt đối không cược thêm!
+    const hasPendingBet = this.betHistory.some(
+      item => item.tableId === tableId && item.result === 'PENDING'
+    );
+    if (hasPendingBet) {
+      return;
+    }
+
+    // LỚP 3: Cooldown an toàn giữa 2 lần cược trên cùng bàn (tối thiểu 10 giây)
+    const now = Date.now();
+    if (state.lastBetTimestamp && (now - state.lastBetTimestamp < 10000)) {
+      return;
+    }
+
+    // LỚP 4: KIỂM TRA CHẶT CHẼ THỜI GIAN ĐẶT CƯỢC (BETTING TIME):
+    // - Chỉ cược khi thời gian đếm ngược còn từ 5s đến 28s.
+    // - TUYỆT ĐỐI BỎ QUA khi betTime < 5s (sát giờ khóa cược, tránh bị trễ nhịp hoặc sàn từ chối).
+    // - TUYỆT ĐỐI BỎ QUA khi betTime === 0 (bàn đang lật bài / chia bài / chưa mở cược).
+    const isBetTimeValid = (typeof betTime === 'number' && betTime >= 5 && betTime <= 28);
+    const canBet = isBetTimeValid && !state.betPlaced;
 
     if (canBet && this.aiEngine) {
       // 1. Gọi Online Adaptive Multi-Model AI Engine dự đoán
       const prediction = this.aiEngine.generatePrediction(tableId, table.name || tableId, history);
 
       if (prediction && prediction.predicted && prediction.predicted !== 'PASS') {
+        // Đánh dấu đã cược ngay lập tức để vòng lặp 1.5s tiếp theo không quét trùng
         state.betPlaced = true;
+        state.lastBetTimestamp = now;
         this.tableStates[tableId] = state;
 
         // 2. Thêm vào nhật ký Explainability trên dashboard
@@ -1585,12 +1634,17 @@ class WMAutoHelper {
         const confPercent = Math.round((prediction.confidence || 0.5) * 100);
 
         if (prediction.shouldBet) {
-          // CHẾ ĐỘ REAL BET: Người dùng chủ động bật "Cược thật" -> Đặt cược thật
-          this.addLog(`⚡ [AI REAL BET] ${prediction.tableName} ➔ Dự đoán ${sideName} (${confPercent}%) | ${prediction.rationale}`, 'success');
-          await this.executeBet(table, targetSide, prediction.rationale);
+          // CHẾ ĐỘ REAL BET: Khóa bàn vào activeBettingTables để ngăn chặn tuyệt đối cược đúp
+          this.activeBettingTables.add(tableId);
+          try {
+            this.addLog(`⚡ [AI REAL BET] ${prediction.tableName} (Còn ${betTime}s) ➔ Cược ${sideName} (${confPercent}%) | ${prediction.rationale}`, 'success');
+            await this.executeBet(table, targetSide, prediction.rationale);
+          } finally {
+            this.activeBettingTables.delete(tableId);
+          }
         } else {
           // CHẾ ĐỘ PAPER TRADING (MẶC ĐỊNH): Mô phỏng an toàn, tuyệt đối không đặt tiền thật!
-          this.addLog(`🤖 [AI PAPER] ${prediction.tableName} ➔ Dự đoán ${sideName} (${confPercent}%) | ${prediction.rationale}`, 'info');
+          this.addLog(`🤖 [AI PAPER] ${prediction.tableName} (Còn ${betTime}s) ➔ Dự đoán ${sideName} (${confPercent}%) | ${prediction.rationale}`, 'info');
         }
       }
     }
