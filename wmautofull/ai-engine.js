@@ -472,11 +472,18 @@
       // Giúp đọc trực tiếp từ file ai_brain.json dùng chung cho mọi Chrome Profile!
       let loadedFromFile = false;
       try {
-        const resp = await fetch('http://127.0.0.1:8421/brain', { method: 'GET', cache: 'no-cache' });
+        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 1200) : null;
+        const resp = await fetch('http://127.0.0.1:8421/brain', {
+          method: 'GET',
+          cache: 'no-cache',
+          signal: controller ? controller.signal : undefined
+        });
+        if (timeoutId) clearTimeout(timeoutId);
         if (resp.ok) {
           const fileData = await resp.json();
           if (fileData && fileData.weights) {
-            await this.importKnowledge(fileData);
+            this.applyKnowledge(fileData);
             this.bridgeConnected = true;
             loadedFromFile = true;
             console.log('[AI Engine] Đã kết nối Local Bridge và tải dữ liệu từ file ai_brain.json thành công!');
@@ -502,7 +509,7 @@
               const bResp = await fetch(bundledUrl);
               if (bResp.ok) {
                 const bData = await bResp.json();
-                await this.importKnowledge(bData);
+                this.applyKnowledge(bData);
                 loadedFromFile = true;
               }
             }
@@ -565,9 +572,8 @@
       };
     }
 
-    async importKnowledge(data) {
+    applyKnowledge(data) {
       if (!data || typeof data !== 'object') return false;
-      if (this.isReadyPromise) await this.isReadyPromise;
       if (data.weights) this.ensemble.weights = Object.assign(this.ensemble.weights, data.weights);
       if (data.markovCounts) this.markov.ngramCounts = Object.assign(this.markov.ngramCounts, data.markovCounts);
       if (data.streakStats) this.streak.streakStats = Object.assign(this.streak.streakStats, data.streakStats);
@@ -575,8 +581,17 @@
       if (data.stats) {
         this.stats = Object.assign(this.stats, data.stats);
       }
-      await this.persistKnowledge();
       this.notifyStats();
+      return true;
+    }
+
+    async importKnowledge(data) {
+      if (!data || typeof data !== 'object') return false;
+      if (this.isReadyPromise) {
+        await this.isReadyPromise;
+      }
+      this.applyKnowledge(data);
+      await this.persistKnowledge();
       return true;
     }
 
@@ -598,11 +613,15 @@
 
       // Tự động lưu thẳng vào file ai_brain.json qua Local Bridge (nếu đang chạy)
       try {
+        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 1500) : null;
         const resp = await fetch('http://127.0.0.1:8421/brain', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
+          signal: controller ? controller.signal : undefined
         });
+        if (timeoutId) clearTimeout(timeoutId);
         if (resp.ok) {
           this.bridgeConnected = true;
         }

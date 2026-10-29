@@ -1,39 +1,122 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-29T14:25:00.000Z",
   "weights": {
-    "markov": 1.0,
-    "streak": 1.0,
+    "markov": 1.064,
+    "streak": 1,
     "table": 0.6
   },
   "markovCounts": {
-    "B": { "B": 18, "P": 17, "T": 4, "total": 35 },
-    "P": { "B": 17, "P": 18, "T": 4, "total": 35 },
-    "BB": { "B": 15, "P": 7, "T": 2, "total": 22 },
-    "PP": { "B": 7, "P": 15, "T": 2, "total": 22 },
-    "BP": { "B": 15, "P": 5, "T": 2, "total": 20 },
-    "PB": { "B": 5, "P": 15, "T": 2, "total": 20 },
-    "BBB": { "B": 5, "P": 13, "T": 1, "total": 18 },
-    "PPP": { "B": 13, "P": 5, "T": 1, "total": 18 },
-    "BPB": { "B": 4, "P": 12, "T": 1, "total": 16 },
-    "PBP": { "B": 12, "P": 4, "T": 1, "total": 16 }
+    "B": {
+      "B": 18,
+      "P": 19,
+      "T": 4,
+      "total": 37
+    },
+    "P": {
+      "B": 17,
+      "P": 18,
+      "T": 4,
+      "total": 35
+    },
+    "BB": {
+      "B": 15,
+      "P": 8,
+      "T": 2,
+      "total": 23
+    },
+    "PP": {
+      "B": 7,
+      "P": 15,
+      "T": 2,
+      "total": 22
+    },
+    "BP": {
+      "B": 15,
+      "P": 5,
+      "T": 2,
+      "total": 20
+    },
+    "PB": {
+      "B": 5,
+      "P": 16,
+      "T": 2,
+      "total": 21
+    },
+    "BBB": {
+      "B": 5,
+      "P": 13,
+      "T": 1,
+      "total": 18
+    },
+    "PPP": {
+      "B": 13,
+      "P": 5,
+      "T": 1,
+      "total": 18
+    },
+    "BPB": {
+      "B": 4,
+      "P": 13,
+      "T": 1,
+      "total": 17
+    },
+    "PBP": {
+      "B": 12,
+      "P": 4,
+      "T": 1,
+      "total": 16
+    },
+    "PBB": {
+      "B": 0,
+      "P": 1,
+      "total": 1
+    },
+    "BPBB": {
+      "B": 0,
+      "P": 1,
+      "total": 1
+    }
   },
   "streakStats": {
-    "B_2": { "continue": 14, "break": 6 },
-    "P_2": { "continue": 14, "break": 6 },
-    "B_3": { "continue": 5, "break": 14 },
-    "P_3": { "continue": 5, "break": 14 }
+    "B_2": {
+      "continue": 14,
+      "break": 7
+    },
+    "P_2": {
+      "continue": 14,
+      "break": 6
+    },
+    "B_3": {
+      "continue": 5,
+      "break": 14
+    },
+    "P_3": {
+      "continue": 5,
+      "break": 14
+    },
+    "B_1": {
+      "continue": 0,
+      "break": 1
+    }
   },
-  "tableShoeStats": {},
+  "tableShoeStats": {
+    "bac_test_01": {
+      "B": 0,
+      "P": 2,
+      "T": 0,
+      "total": 2
+    }
+  },
   "stats": {
-    "totalRoundsObserved": 25,
-    "predictionsScored": 10,
-    "wins": 6,
+    "totalRoundsObserved": 29,
+    "predictionsScored": 12,
+    "wins": 8,
     "losses": 4,
     "tiesPush": 1,
-    "accuracy": 0.6,
+    "accuracy": 0.6666666666666666,
     "baselineAccuracy": 0.5,
-    "edgeOverBaseline": 0.1,
-    "patternsLearnedCount": 14
-  }
+    "edgeOverBaseline": 0.16666666666666663,
+    "patternsLearnedCount": 17
+  },
+  "updatedAt": "2026-10-29T07:49:11.016Z"
 }

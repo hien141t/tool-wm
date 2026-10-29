@@ -20,6 +20,7 @@ class WMAutoHelper {
 
     // Cấu hình mặc định
     this.selectedChip = 10;
+    this.maxTotalBet = 5000; // Hạn mức tổng tiền cược tối đa (0 = không giới hạn)
     this.maxTables = 20;
 
     // Bộ não AI Baccarat thích ứng trực tuyến (Online Adaptive Multi-Model AI Engine)
@@ -102,6 +103,9 @@ class WMAutoHelper {
       const chip = localStorage.getItem('wm_chip');
       if (chip) this.selectedChip = parseInt(chip);
 
+      const maxLimit = localStorage.getItem('wm_max_total_bet');
+      if (maxLimit !== null) this.maxTotalBet = parseInt(maxLimit) || 0;
+
       const maxTables = localStorage.getItem('wm_max_tables');
       if (maxTables) this.maxTables = parseInt(maxTables);
 
@@ -113,6 +117,7 @@ class WMAutoHelper {
   saveSettings() {
     try {
       localStorage.setItem('wm_chip', this.selectedChip);
+      localStorage.setItem('wm_max_total_bet', this.maxTotalBet);
       localStorage.setItem('wm_max_tables', this.maxTables);
       localStorage.setItem('wm_patterns', JSON.stringify(this.patterns));
     } catch (e) {}
@@ -162,6 +167,7 @@ class WMAutoHelper {
 
     const settled = this.stats.wins + this.stats.losses;
     this.stats.winRate = settled > 0 ? Math.round((this.stats.wins / settled) * 100) : 0;
+    this.updateLimitProgressUI();
   }
 
   // ==========================================================================
@@ -246,7 +252,7 @@ class WMAutoHelper {
 
         <div class="wm-card">
           <div class="wm-card-title">
-            <span>💰 Cấu hình tiền cược</span>
+            <span>💰 Cấu hình tiền cược & Hạn mức</span>
           </div>
           <div class="wm-form-grid">
             <div class="wm-form-group">
@@ -262,8 +268,19 @@ class WMAutoHelper {
               </select>
             </div>
             <div class="wm-form-group">
+              <label class="wm-label">Hạn mức tổng cược (Dừng bot):</label>
+              <input type="number" class="wm-input" id="wm-max-total-bet" min="0" step="100" value="5000" placeholder="0 = Không giới hạn" title="Khi tổng tiền cược đạt mức này, bot sẽ tự động dừng lại">
+            </div>
+            <div class="wm-form-group">
               <label class="wm-label">Số bàn tối đa theo dõi:</label>
               <input type="number" class="wm-input" id="wm-max-tables" min="1" max="30" value="20">
+            </div>
+            <div class="wm-form-group">
+              <label class="wm-label">Tiến độ hạn mức cược:</label>
+              <div id="wm-limit-progress-wrap" style="background:#0f121a; border:1px solid #2d384d; border-radius:6px; padding:7px 10px; font-size:11px; display:flex; justify-content:space-between; align-items:center; box-sizing:border-box; height:34px;">
+                <span id="wm-limit-progress-text" style="font-weight:600; color:#38bdf8;">0 / 5,000</span>
+                <span id="wm-limit-percent" style="font-weight:bold; color:#10b981;">0%</span>
+              </div>
             </div>
           </div>
         </div>
@@ -493,6 +510,17 @@ class WMAutoHelper {
       this.selectGameChip(this.selectedChip);
     });
 
+    const maxTotalBetInput = document.getElementById('wm-max-total-bet');
+    if (maxTotalBetInput) {
+      maxTotalBetInput.addEventListener('change', (e) => {
+        const val = parseInt(e.target.value);
+        this.maxTotalBet = isNaN(val) || val < 0 ? 0 : val;
+        this.saveSettings();
+        this.updateLimitProgressUI();
+        this.addLog(`Đã cài đặt Hạn mức tổng cược: ${this.maxTotalBet > 0 ? this.maxTotalBet.toLocaleString('vi-VN') : 'Không giới hạn'}`, 'info');
+      });
+    }
+
     const maxTablesInput = document.getElementById('wm-max-tables');
     maxTablesInput.addEventListener('change', (e) => {
       this.maxTables = Math.max(1, parseInt(e.target.value) || 10);
@@ -656,6 +684,9 @@ class WMAutoHelper {
       const chipSelect = document.getElementById('wm-chip-select');
       if (chipSelect) chipSelect.value = String(this.selectedChip);
 
+      const maxTotalBetInput = document.getElementById('wm-max-total-bet');
+      if (maxTotalBetInput) maxTotalBetInput.value = String(this.maxTotalBet);
+
       const maxTablesInput = document.getElementById('wm-max-tables');
       if (maxTablesInput) maxTablesInput.value = String(this.maxTables);
 
@@ -663,6 +694,7 @@ class WMAutoHelper {
       if (patternsInput && this.patterns.length > 0) {
         patternsInput.value = this.patterns.map(p => `${p.condition}=${p.bet}`).join('\n');
       }
+      this.updateLimitProgressUI();
       this.setControlsLocked(this.isRunning);
     } catch (e) {}
   }
@@ -1528,6 +1560,9 @@ class WMAutoHelper {
     const chipSelect = document.getElementById('wm-chip-select');
     if (chipSelect) chipSelect.disabled = locked;
 
+    const maxTotalBetInput = document.getElementById('wm-max-total-bet');
+    if (maxTotalBetInput) maxTotalBetInput.disabled = locked;
+
     const maxTablesInput = document.getElementById('wm-max-tables');
     if (maxTablesInput) maxTablesInput.disabled = locked;
 
@@ -1551,6 +1586,13 @@ class WMAutoHelper {
   // ==========================================================================
   start() {
     if (this.isRunning) return;
+
+    // Ràng buộc hạn mức tổng tiền cược
+    if (this.maxTotalBet > 0 && this.stats.totalAmount >= this.maxTotalBet) {
+      alert(`⚠️ Tổng tiền cược hiện tại (${this.stats.totalAmount.toLocaleString('vi-VN')}) đã đạt hoặc vượt hạn mức tối đa (${this.maxTotalBet.toLocaleString('vi-VN')})!\n\nVui lòng nâng hạn mức cược hoặc xóa lịch sử cược trước khi bắt đầu.`);
+      this.addLog(`❌ Không thể bắt đầu: Đã đạt hạn mức cược ${this.stats.totalAmount.toLocaleString('vi-VN')} / ${this.maxTotalBet.toLocaleString('vi-VN')}`, 'error');
+      return;
+    }
 
     if (!this.parsePatterns()) return;
 
@@ -1580,6 +1622,14 @@ class WMAutoHelper {
 
   async evaluateAllTablesForBetting() {
     if (!this.isRunning) return;
+
+    // Ràng buộc hạn mức tổng tiền cược: tự động dừng nếu chạm trần
+    if (this.maxTotalBet > 0 && this.stats.totalAmount >= this.maxTotalBet) {
+      this.stop();
+      this.addLog(`🛑 [HẠN MỨC] ĐÃ ĐẠT HẠN MỨC TỔNG TIỀN CƯỢC (${this.stats.totalAmount.toLocaleString('vi-VN')} / ${this.maxTotalBet.toLocaleString('vi-VN')}). Bot tự động dừng!`, 'error');
+      return;
+    }
+
     if (this.isEvaluatingAllTables) return;
 
     this.isEvaluatingAllTables = true;
@@ -1659,6 +1709,13 @@ class WMAutoHelper {
         const confPercent = Math.round((prediction.confidence || 0.5) * 100);
 
         if (prediction.shouldBet) {
+          const betAmount = this.actualGameChip || this.selectedChip || 10;
+          if (this.maxTotalBet > 0 && (this.stats.totalAmount + betAmount) > this.maxTotalBet) {
+            this.stop();
+            this.addLog(`🛑 [HẠN MỨC] Lệnh cược ${betAmount} sẽ vượt hạn mức tổng cược (${this.stats.totalAmount.toLocaleString('vi-VN')} + ${betAmount} > ${this.maxTotalBet.toLocaleString('vi-VN')}). Bot tự động dừng!`, 'error');
+            return;
+          }
+
           // CHẾ ĐỘ REAL BET: Khóa bàn vào activeBettingTables để ngăn chặn tuyệt đối cược đúp
           this.activeBettingTables.add(tableId);
           try {
@@ -1867,6 +1924,12 @@ class WMAutoHelper {
     this.recalculateStats();
     this.saveBetHistory();
     this.renderBetHistory();
+
+    // Kiểm tra nếu tổng tiền cược đã đạt hạn mức tối đa thì lập tức dừng bot
+    if (this.isRunning && this.maxTotalBet > 0 && this.stats.totalAmount >= this.maxTotalBet) {
+      this.stop();
+      this.addLog(`🛑 [HẠN MỨC] ĐÃ ĐẠT HẠN MỨC TỔNG TIỀN CƯỢC (${this.stats.totalAmount.toLocaleString('vi-VN')} / ${this.maxTotalBet.toLocaleString('vi-VN')}). Bot tự động dừng!`, 'error');
+    }
   }
 
   // ==========================================================================
@@ -1932,6 +1995,40 @@ class WMAutoHelper {
     }
   }
 
+  updateLimitProgressUI() {
+    const progressText = document.getElementById('wm-limit-progress-text');
+    const percentEl = document.getElementById('wm-limit-percent');
+    if (!progressText || !percentEl) return;
+
+    const currentTotal = this.stats.totalAmount || 0;
+    const maxLimit = this.maxTotalBet || 0;
+
+    if (maxLimit <= 0) {
+      progressText.textContent = `${currentTotal.toLocaleString('vi-VN')} (Không giới hạn)`;
+      progressText.style.color = '#94a3b8';
+      percentEl.textContent = '∞';
+      percentEl.style.color = '#38bdf8';
+      return;
+    }
+
+    const percent = Math.min(100, Math.round((currentTotal / maxLimit) * 100));
+    progressText.textContent = `${currentTotal.toLocaleString('vi-VN')} / ${maxLimit.toLocaleString('vi-VN')}`;
+
+    if (percent >= 100) {
+      progressText.style.color = '#ef4444';
+      percentEl.style.color = '#ef4444';
+      percentEl.textContent = '100% (ĐẠT HẠN MỨC)';
+    } else if (percent >= 80) {
+      progressText.style.color = '#f59e0b';
+      percentEl.style.color = '#f59e0b';
+      percentEl.textContent = `${percent}%`;
+    } else {
+      progressText.style.color = '#38bdf8';
+      percentEl.style.color = '#10b981';
+      percentEl.textContent = `${percent}%`;
+    }
+  }
+
   updateHeaderMetrics() {
     const metricBets = document.getElementById('wm-metric-bets');
     if (metricBets) metricBets.textContent = this.stats.totalBets;
@@ -1949,6 +2046,7 @@ class WMAutoHelper {
       metricProfit.style.color = p > 0 ? '#10b981' : (p < 0 ? '#ef4444' : '#facc15');
     }
 
+    this.updateLimitProgressUI();
     this.updateMiniPill();
   }
 

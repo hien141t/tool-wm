@@ -18,9 +18,18 @@ class BrainSyncHandler(BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.close_connection = True
 
+    def _send_json_bytes(self, code, data_bytes):
+        self.send_response(code)
+        self._send_cors()
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(data_bytes)))
+        self.end_headers()
+        self.wfile.write(data_bytes)
+
     def do_OPTIONS(self):
         self.send_response(200)
         self._send_cors()
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     def do_GET(self):
@@ -29,34 +38,21 @@ class BrainSyncHandler(BaseHTTPRequestHandler):
                 try:
                     with open(BRAIN_FILE, "r", encoding="utf-8") as f:
                         data = f.read()
-                    self.send_response(200)
-                    self._send_cors()
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.end_headers()
-                    self.wfile.write(data.encode("utf-8"))
+                    self._send_json_bytes(200, data.encode("utf-8"))
                     return
                 except Exception as e:
-                    self.send_response(500)
-                    self._send_cors()
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+                    self._send_json_bytes(500, json.dumps({"error": str(e)}).encode("utf-8"))
                     return
             else:
-                self.send_response(404)
-                self._send_cors()
-                self.end_headers()
-                self.wfile.write(b'{"error": "ai_brain.json not found"}')
+                self._send_json_bytes(404, b'{"error": "ai_brain.json not found"}')
                 return
 
         elif self.path == "/status":
-            self.send_response(200)
-            self._send_cors()
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"status": "running", "port": 8421}')
+            self._send_json_bytes(200, b'{"status": "running", "port": 8421}')
             return
 
         self.send_response(404)
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     def do_POST(self):
@@ -69,11 +65,7 @@ class BrainSyncHandler(BaseHTTPRequestHandler):
                 with open(BRAIN_FILE, "w", encoding="utf-8") as f:
                     json.dump(parsed, f, ensure_ascii=False, indent=2)
 
-                self.send_response(200)
-                self._send_cors()
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(b'{"success": true, "saved": true}')
+                self._send_json_bytes(200, b'{"success": true, "saved": true}')
 
                 now_str = datetime.now().strftime("%H:%M:%S")
                 markov_cnt = len(parsed.get("markovCounts", {}))
@@ -84,13 +76,11 @@ class BrainSyncHandler(BaseHTTPRequestHandler):
                 sys.stdout.flush()
                 return
             except Exception as e:
-                self.send_response(500)
-                self._send_cors()
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+                self._send_json_bytes(500, json.dumps({"error": str(e)}).encode("utf-8"))
                 return
 
         self.send_response(404)
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     def log_message(self, format, *args):
