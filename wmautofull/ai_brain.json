@@ -2,217 +2,217 @@
   "version": 2,
   "weights": {
     "markov": 1.0904077904796878,
-    "streak": 0.6923186064745125,
-    "table": 0.4572335749203455
+    "streak": 0.5859784685200274,
+    "table": 0.7378550595836382
   },
   "markovCounts": {
     "P": {
-      "B": 1328,
-      "P": 1293,
-      "total": 2621
+      "B": 1437,
+      "P": 1422,
+      "total": 2859
     },
     "PP": {
-      "B": 610,
-      "P": 599,
-      "total": 1209
+      "B": 664,
+      "P": 665,
+      "total": 1329
     },
     "BPP": {
-      "B": 301,
-      "P": 304,
-      "total": 605
+      "B": 324,
+      "P": 333,
+      "total": 657
     },
     "BBPP": {
-      "B": 138,
-      "P": 133,
-      "total": 271
+      "B": 150,
+      "P": 143,
+      "total": 293
     },
     "PPP": {
-      "B": 278,
-      "P": 268,
-      "total": 546
+      "B": 304,
+      "P": 302,
+      "total": 606
     },
     "BPPP": {
-      "B": 142,
-      "P": 132,
-      "total": 274
+      "B": 150,
+      "P": 150,
+      "total": 300
     },
     "BP": {
-      "B": 656,
-      "P": 643,
-      "total": 1299
+      "B": 707,
+      "P": 698,
+      "total": 1405
     },
     "BBP": {
-      "B": 321,
-      "P": 297,
-      "total": 618
+      "B": 344,
+      "P": 319,
+      "total": 663
     },
     "BBBP": {
-      "B": 165,
-      "P": 141,
-      "total": 306
+      "B": 176,
+      "P": 155,
+      "total": 331
     },
     "B": {
-      "B": 1441,
-      "P": 1338,
-      "total": 2779
+      "B": 1548,
+      "P": 1443,
+      "total": 2991
     },
     "BB": {
-      "B": 715,
-      "P": 648,
-      "total": 1363
+      "B": 770,
+      "P": 693,
+      "total": 1463
     },
     "BBB": {
-      "B": 357,
-      "P": 318,
-      "total": 675
+      "B": 381,
+      "P": 345,
+      "total": 726
     },
     "BBBB": {
-      "B": 188,
-      "P": 147,
-      "total": 335
+      "B": 199,
+      "P": 158,
+      "total": 357
     },
     "PB": {
-      "B": 665,
-      "P": 633,
-      "total": 1298
+      "B": 714,
+      "P": 689,
+      "total": 1403
     },
     "BPB": {
-      "B": 319,
-      "P": 323,
-      "total": 642
+      "B": 340,
+      "P": 352,
+      "total": 692
     },
     "BBPB": {
-      "B": 152,
-      "P": 159,
-      "total": 311
+      "B": 160,
+      "P": 174,
+      "total": 334
     },
     "PPB": {
-      "B": 310,
-      "P": 284,
-      "total": 594
+      "B": 336,
+      "P": 309,
+      "total": 645
     },
     "PPPB": {
-      "B": 145,
-      "P": 128,
-      "total": 273
+      "B": 158,
+      "P": 143,
+      "total": 301
     },
     "PBP": {
-      "B": 305,
-      "P": 312,
-      "total": 617
+      "B": 333,
+      "P": 341,
+      "total": 674
     },
     "BPBP": {
-      "B": 149,
-      "P": 168,
-      "total": 317
+      "B": 164,
+      "P": 184,
+      "total": 348
     },
     "PBPB": {
-      "B": 150,
-      "P": 149,
-      "total": 299
+      "B": 163,
+      "P": 163,
+      "total": 326
     },
     "PBB": {
-      "B": 332,
-      "P": 290,
-      "total": 622
+      "B": 360,
+      "P": 308,
+      "total": 668
     },
     "PPBB": {
-      "B": 158,
-      "P": 132,
-      "total": 290
-    },
-    "PPBP": {
-      "B": 145,
-      "P": 129,
-      "total": 274
-    },
-    "PBPP": {
-      "B": 143,
-      "P": 155,
-      "total": 298
-    },
-    "PBBB": {
-      "B": 155,
-      "P": 158,
+      "B": 176,
+      "P": 137,
       "total": 313
     },
+    "PPBP": {
+      "B": 157,
+      "P": 140,
+      "total": 297
+    },
+    "PBPP": {
+      "B": 153,
+      "P": 171,
+      "total": 324
+    },
+    "PBBB": {
+      "B": 168,
+      "P": 171,
+      "total": 339
+    },
     "BPPB": {
-      "B": 156,
-      "P": 134,
-      "total": 290
+      "B": 165,
+      "P": 142,
+      "total": 307
     },
     "PBBP": {
-      "B": 135,
-      "P": 136,
-      "total": 271
+      "B": 147,
+      "P": 144,
+      "total": 291
     },
     "BPBB": {
-      "B": 152,
-      "P": 143,
-      "total": 295
+      "B": 161,
+      "P": 155,
+      "total": 316
     },
     "PPPP": {
-      "B": 123,
-      "P": 122,
-      "total": 245
+      "B": 138,
+      "P": 138,
+      "total": 276
     }
   },
   "streakStats": {
     "P_2": {
-      "continue": 331,
-      "break": 332
+      "continue": 363,
+      "break": 360
     },
     "P_3": {
-      "continue": 146,
-      "break": 155
+      "continue": 164,
+      "break": 166
     },
     "P_1": {
-      "continue": 643,
-      "break": 656
+      "continue": 698,
+      "break": 707
     },
     "B_8": {
       "continue": 4,
       "break": 4
     },
     "B_1": {
-      "continue": 665,
-      "break": 633
+      "continue": 714,
+      "break": 689
     },
     "B_2": {
-      "continue": 358,
-      "break": 330
+      "continue": 389,
+      "break": 348
     },
     "B_3": {
-      "continue": 169,
-      "break": 171
+      "continue": 182,
+      "break": 187
     },
     "P_4": {
-      "continue": 67,
-      "break": 65
+      "continue": 75,
+      "break": 74
     },
     "B_4": {
-      "continue": 60,
-      "break": 95
+      "continue": 65,
+      "break": 103
     },
     "P_5": {
-      "continue": 35,
-      "break": 31
+      "continue": 38,
+      "break": 34
     },
     "P_6": {
-      "continue": 15,
+      "continue": 18,
       "break": 16
     },
     "P_7": {
-      "continue": 3,
-      "break": 10
+      "continue": 5,
+      "break": 11
     },
     "B_5": {
-      "continue": 30,
-      "break": 27
+      "continue": 35,
+      "break": 28
     },
     "B_6": {
-      "continue": 19,
-      "break": 11
+      "continue": 20,
+      "break": 13
     },
     "B_7": {
       "continue": 7,
@@ -280,7 +280,7 @@
     },
     "P_8": {
       "continue": 2,
-      "break": 0
+      "break": 2
     },
     "P_9": {
       "continue": 0,
@@ -410,15 +410,15 @@
     },
     "groupMultiple_101_1356": {
       "B": 118,
-      "P": 108,
+      "P": 109,
       "T": 17,
-      "total": 243
+      "total": 244
     },
     "groupMultiple_101_530": {
-      "B": 128,
+      "B": 129,
       "P": 116,
       "T": 24,
-      "total": 268
+      "total": 269
     },
     "groupMultiple_103_1415": {
       "B": 16,
@@ -433,10 +433,10 @@
       "total": 22
     },
     "groupMultiple_101_533": {
-      "B": 134,
+      "B": 135,
       "P": 108,
       "T": 23,
-      "total": 265
+      "total": 266
     },
     "groupMultiple_101_939": {
       "B": 62,
@@ -499,52 +499,52 @@
       "total": 63
     },
     "groupMultiple_101_1355:1": {
-      "B": 1,
-      "P": 2,
-      "T": 0,
-      "total": 3
+      "B": 8,
+      "P": 9,
+      "T": 6,
+      "total": 23
     },
     "groupMultiple_101_507:1": {
-      "B": 5,
-      "P": 6,
-      "T": 1,
-      "total": 12
+      "B": 11,
+      "P": 22,
+      "T": 3,
+      "total": 36
     },
     "groupMultiple_101_1357:1": {
-      "B": 4,
-      "P": 7,
-      "T": 2,
-      "total": 13
+      "B": 15,
+      "P": 17,
+      "T": 4,
+      "total": 36
     },
     "groupMultiple_101_1362:1": {
-      "B": 4,
-      "P": 9,
-      "T": 0,
-      "total": 13
+      "B": 15,
+      "P": 17,
+      "T": 4,
+      "total": 36
     },
     "groupMultiple_101_933:1": {
-      "B": 3,
-      "P": 1,
-      "T": 0,
-      "total": 4
+      "B": 14,
+      "P": 10,
+      "T": 3,
+      "total": 27
     },
     "groupMultiple_101_505:1": {
-      "B": 3,
-      "P": 2,
-      "T": 3,
-      "total": 8
+      "B": 11,
+      "P": 12,
+      "T": 5,
+      "total": 28
     },
     "groupMultiple_102_1392:1": {
       "B": 0,
       "P": 0,
-      "T": 1,
-      "total": 1
+      "T": 3,
+      "total": 3
     },
     "groupMultiple_101_931:1": {
-      "B": 0,
-      "P": 1,
-      "T": 0,
-      "total": 1
+      "B": 4,
+      "P": 7,
+      "T": 1,
+      "total": 12
     },
     "groupMultiple_101_935:1": {
       "B": 10,
@@ -553,16 +553,16 @@
       "total": 21
     },
     "groupMultiple_101_503:1": {
-      "B": 11,
-      "P": 6,
+      "B": 16,
+      "P": 19,
       "T": 3,
-      "total": 20
+      "total": 38
     },
     "groupMultiple_101_1365:1": {
-      "B": 0,
-      "P": 2,
-      "T": 1,
-      "total": 3
+      "B": 7,
+      "P": 13,
+      "T": 4,
+      "total": 24
     },
     "groupMultiple_101_938:1": {
       "B": 7,
@@ -572,110 +572,164 @@
     },
     "groupMultiple_101_932:1": {
       "B": 11,
-      "P": 9,
+      "P": 11,
       "T": 2,
-      "total": 22
+      "total": 24
     },
     "groupMultiple_108_7:1": {
       "B": 0,
       "P": 0,
-      "T": 1,
-      "total": 1
-    },
-    "groupMultiple_101_501:1": {
-      "B": 11,
-      "P": 8,
-      "T": 3,
-      "total": 22
-    },
-    "groupMultiple_101_537:1": {
-      "B": 9,
-      "P": 11,
-      "T": 1,
-      "total": 21
-    },
-    "groupMultiple_101_1361:1": {
-      "B": 7,
-      "P": 10,
-      "T": 5,
-      "total": 22
-    },
-    "groupMultiple_101_508:1": {
-      "B": 12,
-      "P": 7,
-      "T": 2,
-      "total": 21
-    },
-    "groupMultiple_107_2:1": {
-      "B": 6,
-      "P": 2,
-      "T": 0,
+      "T": 8,
       "total": 8
     },
-    "groupMultiple_101_1353:1": {
+    "groupMultiple_101_501:1": {
+      "B": 12,
+      "P": 8,
+      "T": 3,
+      "total": 23
+    },
+    "groupMultiple_101_537:1": {
+      "B": 20,
+      "P": 22,
+      "T": 5,
+      "total": 47
+    },
+    "groupMultiple_101_1361:1": {
+      "B": 18,
+      "P": 17,
+      "T": 7,
+      "total": 42
+    },
+    "groupMultiple_101_508:1": {
+      "B": 18,
+      "P": 15,
+      "T": 2,
+      "total": 35
+    },
+    "groupMultiple_107_2:1": {
       "B": 11,
       "P": 6,
-      "T": 1,
-      "total": 18
+      "T": 0,
+      "total": 17
+    },
+    "groupMultiple_101_1353:1": {
+      "B": 13,
+      "P": 11,
+      "T": 3,
+      "total": 27
     },
     "groupMultiple_101_939:1": {
-      "B": 9,
-      "P": 3,
+      "B": 13,
+      "P": 9,
       "T": 1,
-      "total": 13
+      "total": 23
     },
     "groupMultiple_108_6:1": {
+      "B": 0,
+      "P": 0,
+      "T": 10,
+      "total": 10
+    },
+    "groupMultiple_102_540:1": {
+      "B": 0,
+      "P": 0,
+      "T": 5,
+      "total": 5
+    },
+    "groupMultiple_101_531:1": {
+      "B": 11,
+      "P": 8,
+      "T": 1,
+      "total": 20
+    },
+    "groupMultiple_108_7:2": {
       "B": 0,
       "P": 0,
       "T": 4,
       "total": 4
     },
-    "groupMultiple_102_540:1": {
-      "B": 0,
-      "P": 0,
-      "T": 1,
-      "total": 1
-    },
-    "groupMultiple_101_531:1": {
-      "B": 3,
-      "P": 6,
-      "T": 0,
-      "total": 9
-    },
-    "groupMultiple_108_7:2": {
-      "B": 0,
-      "P": 0,
-      "T": 2,
-      "total": 2
-    },
     "groupMultiple_101_1363:1": {
-      "B": 4,
-      "P": 4,
-      "T": 2,
-      "total": 10
+      "B": 10,
+      "P": 7,
+      "T": 4,
+      "total": 21
     },
     "groupMultiple_101_1352:1": {
-      "B": 6,
-      "P": 2,
-      "T": 0,
-      "total": 8
+      "B": 10,
+      "P": 8,
+      "T": 2,
+      "total": 20
     },
     "groupMultiple_101_1351:1": {
-      "B": 4,
-      "P": 1,
-      "T": 0,
-      "total": 5
+      "B": 12,
+      "P": 8,
+      "T": 1,
+      "total": 21
     },
     "groupMultiple_101_1360:1": {
-      "B": 1,
-      "P": 1,
-      "T": 1,
-      "total": 3
+      "B": 7,
+      "P": 10,
+      "T": 3,
+      "total": 20
     },
     "groupMultiple_101_534:1": {
-      "B": 1,
-      "P": 1,
+      "B": 9,
+      "P": 11,
+      "T": 4,
+      "total": 24
+    },
+    "groupMultiple_101_533:1": {
+      "B": 5,
+      "P": 14,
       "T": 1,
+      "total": 20
+    },
+    "groupMultiple_101_1356:1": {
+      "B": 8,
+      "P": 11,
+      "T": 1,
+      "total": 20
+    },
+    "groupMultiple_101_530:1": {
+      "B": 13,
+      "P": 6,
+      "T": 2,
+      "total": 21
+    },
+    "groupMultiple_101_502:1": {
+      "B": 9,
+      "P": 10,
+      "T": 1,
+      "total": 20
+    },
+    "groupMultiple_101_502": {
+      "B": 1,
+      "P": 0,
+      "T": 0,
+      "total": 1
+    },
+    "groupMultiple_101_506:1": {
+      "B": 11,
+      "P": 9,
+      "T": 2,
+      "total": 22
+    },
+    "groupMultiple_101_936:1": {
+      "B": 11,
+      "P": 10,
+      "T": 3,
+      "total": 24
+    },
+    "groupMultiple_101_937:1": {
+      "B": 8,
+      "P": 6,
+      "T": 4,
+      "total": 18
+    },
+    "groupMultiple_107_2:2": {
+      "B": 0,
+      "P": 3,
+      "T": 0,
       "total": 3
     }
   },
@@ -685,162 +739,164 @@
       "side": "B",
       "outcome": "B",
       "profit": 0.95,
-      "timestamp": 1793283759117
+      "timestamp": 1793291617755
+    },
+    {
+      "isWin": false,
+      "side": "B",
+      "outcome": "P",
+      "profit": -1,
+      "timestamp": 1793291698452
     },
     {
       "isWin": true,
-      "side": "B",
-      "outcome": "B",
-      "profit": 0.95,
-      "timestamp": 1793283810714
+      "side": "P",
+      "outcome": "P",
+      "profit": 1,
+      "timestamp": 1793291699662
     },
     {
       "isWin": true,
-      "side": "B",
-      "outcome": "B",
-      "profit": 0.95,
-      "timestamp": 1793284361496
-    },
-    {
-      "isWin": false,
-      "side": "B",
+      "side": "P",
       "outcome": "P",
-      "profit": -1,
-      "timestamp": 1793284461108
-    },
-    {
-      "isWin": false,
-      "side": "B",
-      "outcome": "P",
-      "profit": -1,
-      "timestamp": 1793284679501
-    },
-    {
-      "isWin": false,
-      "side": "B",
-      "outcome": "P",
-      "profit": -1,
-      "timestamp": 1793284859493
-    },
-    {
-      "isWin": false,
-      "side": "B",
-      "outcome": "P",
-      "profit": -1,
-      "timestamp": 1793285807475
-    },
-    {
-      "isWin": false,
-      "side": "B",
-      "outcome": "P",
-      "profit": -1,
-      "timestamp": 1793285863872
-    },
-    {
-      "isWin": false,
-      "side": "B",
-      "outcome": "P",
-      "profit": -1,
-      "timestamp": 1793286139874
+      "profit": 1,
+      "timestamp": 1793291739253
     },
     {
       "isWin": true,
-      "side": "B",
+      "side": "P",
+      "outcome": "P",
+      "profit": 1,
+      "timestamp": 1793291742868
+    },
+    {
+      "isWin": false,
+      "side": "P",
       "outcome": "B",
-      "profit": 0.95,
-      "timestamp": 1793286187884
+      "profit": -1,
+      "timestamp": 1793291819645
     },
     {
       "isWin": false,
-      "side": "B",
-      "outcome": "P",
+      "side": "P",
+      "outcome": "B",
       "profit": -1,
-      "timestamp": 1793286555072
-    },
-    {
-      "isWin": false,
-      "side": "B",
-      "outcome": "P",
-      "profit": -1,
-      "timestamp": 1793286637876
-    },
-    {
-      "isWin": false,
-      "side": "B",
-      "outcome": "P",
-      "profit": -1,
-      "timestamp": 1793290033203
-    },
-    {
-      "isWin": false,
-      "side": "B",
-      "outcome": "P",
-      "profit": -1,
-      "timestamp": 1793290084792
-    },
-    {
-      "isWin": false,
-      "side": "B",
-      "outcome": "P",
-      "profit": -1,
-      "timestamp": 1793290101586
+      "timestamp": 1793291823255
     },
     {
       "isWin": true,
-      "side": "B",
-      "outcome": "B",
-      "profit": 0.95,
-      "timestamp": 1793290181987
-    },
-    {
-      "isWin": false,
-      "side": "B",
+      "side": "P",
       "outcome": "P",
-      "profit": -1,
-      "timestamp": 1793290231187
-    },
-    {
-      "isWin": false,
-      "side": "B",
-      "outcome": "P",
-      "profit": -1,
-      "timestamp": 1793290250391
+      "profit": 1,
+      "timestamp": 1793291865244
     },
     {
       "isWin": true,
-      "side": "B",
+      "side": "P",
+      "outcome": "P",
+      "profit": 1,
+      "timestamp": 1793291907259
+    },
+    {
+      "isWin": true,
+      "side": "P",
+      "outcome": "P",
+      "profit": 1,
+      "timestamp": 1793291908458
+    },
+    {
+      "isWin": false,
+      "side": "P",
       "outcome": "B",
-      "profit": 0.95,
-      "timestamp": 1793290285209
+      "profit": -1,
+      "timestamp": 1793291910851
+    },
+    {
+      "isWin": true,
+      "side": "P",
+      "outcome": "P",
+      "profit": 1,
+      "timestamp": 1793291959835
     },
     {
       "isWin": false,
       "side": "B",
       "outcome": "P",
       "profit": -1,
-      "timestamp": 1793290334407
+      "timestamp": 1793292078052
+    },
+    {
+      "isWin": false,
+      "side": "P",
+      "outcome": "B",
+      "profit": -1,
+      "timestamp": 1793292078066
+    },
+    {
+      "isWin": false,
+      "side": "P",
+      "outcome": "B",
+      "profit": -1,
+      "timestamp": 1793292129247
+    },
+    {
+      "isWin": true,
+      "side": "P",
+      "outcome": "P",
+      "profit": 1,
+      "timestamp": 1793292314049
+    },
+    {
+      "isWin": true,
+      "side": "P",
+      "outcome": "P",
+      "profit": 1,
+      "timestamp": 1793292406450
+    },
+    {
+      "isWin": false,
+      "side": "P",
+      "outcome": "B",
+      "profit": -1,
+      "timestamp": 1793292452053
+    },
+    {
+      "isWin": false,
+      "side": "P",
+      "outcome": "B",
+      "profit": -1,
+      "timestamp": 1793292497663
+    },
+    {
+      "isWin": false,
+      "side": "B",
+      "outcome": "P",
+      "profit": -1,
+      "timestamp": 1793292663488
     }
   ],
   "stats": {
-    "totalRoundsObserved": 6132,
-    "predictionsScored": 705,
-    "wins": 353,
-    "losses": 352,
-    "tiesPush": 69,
-    "accuracy": 0.500709219858156,
+    "totalRoundsObserved": 6667,
+    "predictionsScored": 731,
+    "wins": 366,
+    "losses": 365,
+    "tiesPush": 75,
+    "accuracy": 0.5006839945280438,
     "baselineAccuracy": 0.5,
-    "edgeOverBaseline": 0.0007092198581559739,
+    "edgeOverBaseline": 0.0006839945280437965,
     "patternsLearnedCount": 62,
-    "netUnitsWon": -12.1,
-    "expectedValue": -0.017,
-    "totalPassCount": 58339,
-    "rollingAccuracy": 0.3,
-    "currentLossStreak": 1,
-    "maxLossStreak": 6,
-    "riskGuardStatus": "UNDERPERFORMING"
+    "netUnitsWon": 0.9,
+    "expectedValue": 0.001,
+    "totalPassCount": 228,
+    "rollingAccuracy": 0.5,
+    "currentLossStreak": 3,
+    "maxLossStreak": 3,
+    "riskGuardStatus": "NORMAL",
+    "filterMode": "MEDIUM",
+    "filterModeLabel": "⚖️ Medium (≥5)"
   },
-  "updatedAt": "2026-10-29T16:13:12.002Z",
-  "revision": 160,
+  "updatedAt": "2026-10-29T16:52:47.918Z",
+  "revision": 413,
   "writerId": "bridge",
-  "savedAt": "2026-10-29T23:13:12.007714"
+  "savedAt": "2026-10-29T23:52:47.940266"
 }
