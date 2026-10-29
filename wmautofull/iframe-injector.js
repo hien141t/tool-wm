@@ -1,0 +1,710 @@
+// iframe-injector.js - Chạy trong tất cả các iframe để tương tác DOM và lắng nghe sự kiện
+(function() {
+  'use strict';
+  console.log('[WM Injector] Script đã nạp vào iframe:', window.location.href);
+
+  const cachedTablesMap = new Map();
+  let lastAutoScrollTime = 0;
+
+  function getTargetDoc() {
+    const iframe109 = document.getElementById('iframe_109');
+    if (iframe109) {
+      try {
+        const d = iframe109.contentDocument || iframe109.contentWindow?.document;
+        if (d) return d;
+      } catch (e) {}
+    }
+    return document;
+  }
+
+  // Lắng nghe lệnh từ trang cha
+  window.addEventListener('message', function(event) {
+    const data = event.data;
+    if (!data || !data.action) return;
+
+    switch (data.action) {
+      case 'FIND_ELEMENT':
+        findElement(data.selector, data.type, data.messageId);
+        break;
+      case 'CLICK_ELEMENT':
+        clickElement(data.selector, data.type, data.messageId);
+        break;
+      case 'GET_INFO':
+        getInfo(data.messageId);
+        break;
+      case 'GET_ALL_IDS':
+        getAllIds(data.messageId);
+        break;
+      case 'FIND_IN_NESTED_IFRAME':
+        findInNestedIframe(data.iframeId, data.selector, data.type, data.messageId);
+        break;
+      case 'CLICK_IN_NESTED_IFRAME':
+        clickInNestedIframe(data.iframeId, data.selector, data.type, data.messageId);
+        break;
+      case 'GET_TABLES':
+        getTables(data.messageId);
+        break;
+      case 'CLICK_BET_ZONE':
+        clickBetZone(data.tableId, data.bet, data.messageId);
+        break;
+      case 'CLICK_CONFIRM':
+        clickConfirm(data.tableId, data.messageId);
+        break;
+      case 'FORCE_SCROLL_TABLES':
+        forceScrollAllTables(data.messageId);
+        break;
+      case 'SELECT_CHIP':
+        selectChip(data.chip, data.messageId);
+        break;
+    }
+  });
+
+  function findElement(selector, type, messageId) {
+    let el = null;
+    try {
+      const doc = getTargetDoc();
+      if (type === 'id') {
+        el = doc.getElementById(selector);
+      } else if (type === 'css') {
+        el = doc.querySelector(selector);
+      } else if (type === 'xpath') {
+        const res = doc.evaluate(selector, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        el = res.singleNodeValue;
+      }
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        found: !!el,
+        selector: selector
+      }, '*');
+    } catch (err) {
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        found: false,
+        error: err.message
+      }, '*');
+    }
+  }
+
+  function clickElement(selector, type, messageId) {
+    let el = null;
+    try {
+      const doc = getTargetDoc();
+      if (type === 'id') {
+        el = doc.getElementById(selector);
+      } else if (type === 'css') {
+        el = doc.querySelector(selector);
+      } else if (type === 'xpath') {
+        const res = doc.evaluate(selector, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        el = res.singleNodeValue;
+      }
+
+      if (el) {
+        el.click();
+        window.parent.postMessage({
+          type: 'WM_IFRAME_RESPONSE',
+          messageId: messageId,
+          success: true,
+          action: 'clicked'
+        }, '*');
+      } else {
+        window.parent.postMessage({
+          type: 'WM_IFRAME_RESPONSE',
+          messageId: messageId,
+          success: false,
+          error: 'Element not found'
+        }, '*');
+      }
+    } catch (err) {
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        success: false,
+        error: err.message
+      }, '*');
+    }
+  }
+
+  function getInfo(messageId) {
+    const info = {
+      type: 'WM_IFRAME_RESPONSE',
+      messageId: messageId,
+      url: window.location.href,
+      title: document.title,
+      bodyExists: !!document.body,
+      elementCount: document.querySelectorAll('*').length
+    };
+    window.parent.postMessage(info, '*');
+  }
+
+  function getAllIds(messageId) {
+    try {
+      const ids = Array.from(document.querySelectorAll('[id]')).map(el => el.id).filter(Boolean);
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        ids: ids,
+        count: ids.length
+      }, '*');
+    } catch (err) {
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        ids: [],
+        error: err.message
+      }, '*');
+    }
+  }
+
+  function findInNestedIframe(iframeId, selector, type, messageId) {
+    try {
+      const iframe = document.getElementById(iframeId);
+      const doc = iframe ? (iframe.contentDocument || iframe.contentWindow?.document) : document;
+
+      let el = null;
+      if (type === 'id') {
+        el = doc.getElementById(selector);
+      } else if (type === 'css') {
+        el = doc.querySelector(selector);
+      } else if (type === 'xpath') {
+        const res = doc.evaluate(selector, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        el = res.singleNodeValue;
+      }
+
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        found: !!el,
+        selector: selector
+      }, '*');
+    } catch (err) {
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        found: false,
+        error: err.message
+      }, '*');
+    }
+  }
+
+  function clickInNestedIframe(iframeId, selector, type, messageId) {
+    try {
+      const iframe = document.getElementById(iframeId);
+      const doc = iframe ? (iframe.contentDocument || iframe.contentWindow?.document) : document;
+
+      let el = null;
+      if (type === 'id') {
+        el = doc.getElementById(selector);
+      } else if (type === 'css') {
+        el = doc.querySelector(selector);
+      } else if (type === 'xpath') {
+        const res = doc.evaluate(selector, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        el = res.singleNodeValue;
+      }
+
+      if (el) {
+        el.click();
+        window.parent.postMessage({
+          type: 'WM_IFRAME_RESPONSE',
+          messageId: messageId,
+          success: true,
+          action: 'clicked'
+        }, '*');
+      } else {
+        window.parent.postMessage({
+          type: 'WM_IFRAME_RESPONSE',
+          messageId: messageId,
+          success: false,
+          error: 'Element not found'
+        }, '*');
+      }
+    } catch (err) {
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        success: false,
+        error: err.message
+      }, '*');
+    }
+  }
+
+  function forceScrollAllTables(messageId) {
+    try {
+      const doc = getTargetDoc();
+      const scrollers = Array.from(doc.querySelectorAll('*')).filter(el => {
+        try {
+          const style = window.getComputedStyle(el);
+          return (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 50;
+        } catch (e) {
+          return false;
+        }
+      });
+
+      if (scrollers.length > 0) {
+        scrollers.forEach(s => {
+          const oldTop = s.scrollTop;
+          s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' });
+          setTimeout(() => s.scrollTo({ top: oldTop, behavior: 'smooth' }), 500);
+        });
+      } else {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 500);
+      }
+
+      setTimeout(() => getTables(messageId), 1000);
+    } catch (e) {
+      getTables(messageId);
+    }
+  }
+
+  // Trích xuất tên bàn thân thiện (dịch từ ID hoặc đọc DOM)
+  function extractTableName(box, id) {
+    if (box) {
+      const titleSelectors = [
+        '.gameroom-title', '.table-name', '.title', '.table_title', '.name',
+        '[class*="gameroom-title"]', '[class*="table-name"]', '[class*="tableName"]',
+        '[class*="title"]', '.gameroom_header', '.header'
+      ];
+      for (const sel of titleSelectors) {
+        try {
+          const el = box.querySelector(sel);
+          if (el) {
+            const txt = (el.innerText || el.textContent || '').trim();
+            if (txt && /(?:\([^)]+\))?\s*Bac\s*\d+/i.test(txt)) {
+              return txt;
+            }
+          }
+        } catch (e) {}
+      }
+
+      try {
+        const allSub = box.querySelectorAll('*');
+        for (const el of allSub) {
+          if (!el.children || el.children.length === 0) {
+            const txt = (el.innerText || el.textContent || '').trim();
+            if (txt && /^(?:\([^)]+\))?\s*Bac\s*\d+$/i.test(txt)) {
+              return txt;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (id) {
+      const idMatch = id.match(/groupMultiple_(\d+)_(\d+)/i) || id.match(/_(\d{3,4})$/);
+      if (idMatch) {
+        const tableNum = parseInt(idMatch[2] || idMatch[1]);
+        if (tableNum >= 501 && tableNum <= 599) return `(Sexy)Bac ${tableNum - 500}`;
+        if (tableNum >= 101 && tableNum <= 199) return `(Classic)Bac ${tableNum - 100}`;
+        if (tableNum >= 201 && tableNum <= 299) return `(Speed)Bac ${tableNum - 200}`;
+        if (tableNum >= 301 && tableNum <= 399) return `(Mi)Bac ${tableNum - 300}`;
+        if (tableNum >= 601 && tableNum <= 699) return `(Special)Bac ${tableNum - 600}`;
+        return `Bac ${tableNum}`;
+      }
+    }
+
+    return id || 'Bàn Chơi';
+  }
+
+  // Trích xuất lịch sử cầu đa tầng (Châu Bàn, Đại Lộ, SVG, Text)
+  function extractRoadHistory(box) {
+    if (!box) return [];
+
+    // LAYER 1: ZhuPan Road (Châu Bàn / Bead Road) - type61..type72
+    try {
+      const zhuPanNodes = box.querySelectorAll(
+        '.zhuPanRoad [class*="type"], .zhuPanRoad *, [class*="zhuPan"] *, [class*="cardroad_item"] [class*="type"], [class*="type6"], [class*="type7"]'
+      );
+      const zhuPanReg = /\btype[_-]?(6[1-9]|7[0-2])\b/i;
+      const validZhuPan = [];
+
+      zhuPanNodes.forEach(el => {
+        const classStr = (typeof el.className === 'string') ? el.className : (el.classList ? Array.from(el.classList).join(' ') : '');
+        const m = classStr.match(zhuPanReg);
+        if (m) {
+          const code = parseInt(m[1]);
+          if (code >= 61 && code <= 64) validZhuPan.push('B');
+          else if (code >= 65 && code <= 68) validZhuPan.push('P');
+          else if (code >= 69 && code <= 72) validZhuPan.push('T');
+        }
+      });
+
+      if (validZhuPan.length > 0) {
+        return validZhuPan.slice(-24);
+      }
+    } catch (e) {}
+
+    // LAYER 2: DaLu Road (Đại Lộ / Big Road) - type1..type12
+    try {
+      const daLuNodes = box.querySelectorAll(
+        '.daLuRoad [class*="type"], .daLuRoad *, [class*="daLu"] *, [class*="type1"], [class*="type2"], [class*="type3"], [class*="type4"], [class*="type5"]'
+      );
+      const daLuReg = /\btype[_-]?([1-9]|1[0-2])\b/i;
+      const validDaLu = [];
+
+      daLuNodes.forEach(el => {
+        const classStr = (typeof el.className === 'string') ? el.className : (el.classList ? Array.from(el.classList).join(' ') : '');
+        const m = classStr.match(daLuReg);
+        if (m) {
+          const code = parseInt(m[1]);
+          if (code >= 1 && code <= 4) validDaLu.push('B');
+          else if (code >= 5 && code <= 8) validDaLu.push('P');
+          else if (code >= 9 && code <= 12) validDaLu.push('T');
+        }
+      });
+
+      if (validDaLu.length > 0) {
+        return validDaLu.slice(-24);
+      }
+    } catch (e) {}
+
+    // LAYER 3: Semantic classes (banker, player, zhuang, xian, tie)
+    try {
+      const roadItems = box.querySelectorAll('[class*="road"] [class*="dot"], [class*="road"] [class*="item"], [class*="cardroad"] > *');
+      const validSemantic = [];
+      roadItems.forEach(el => {
+        const cls = (typeof el.className === 'string' ? el.className : '').toLowerCase();
+        if (cls.includes('banker') || cls.includes('zhuang') || cls.includes('red')) {
+          validSemantic.push('B');
+        } else if (cls.includes('player') || cls.includes('xian') || cls.includes('blue')) {
+          validSemantic.push('P');
+        } else if (cls.includes('tie') || cls.includes('he') || cls.includes('green')) {
+          validSemantic.push('T');
+        }
+      });
+      if (validSemantic.length > 0) return validSemantic.slice(-24);
+    } catch (e) {}
+
+    // LAYER 4: SVG circles / rects / paths
+    try {
+      const svgDots = box.querySelectorAll('svg circle, svg rect, svg path');
+      const validSvg = [];
+      svgDots.forEach(dot => {
+        const fill = (dot.getAttribute ? dot.getAttribute('fill') : '') || '';
+        const stroke = (dot.getAttribute ? dot.getAttribute('stroke') : '') || '';
+        const cls = (dot.getAttribute ? dot.getAttribute('class') : '') || '';
+        const f = (fill + ' ' + stroke + ' ' + cls).toLowerCase();
+
+        if (f.includes('red') || f.includes('#ef') || f.includes('#b9') || f.includes('#dc') || f.includes('banker')) {
+          validSvg.push('B');
+        } else if (f.includes('blue') || f.includes('#3b') || f.includes('#1d') || f.includes('#25') || f.includes('player')) {
+          validSvg.push('P');
+        } else if (f.includes('green') || f.includes('#10') || f.includes('#16') || f.includes('tie')) {
+          validSvg.push('T');
+        }
+      });
+      if (validSvg.length > 0) return validSvg.slice(-24);
+    } catch (e) {}
+
+    // LAYER 5: Text nodes 'B', 'P', 'T'
+    try {
+      const textNodes = box.querySelectorAll('.zhuPanRoad *, .daLuRoad *, [class*="road"] *');
+      const validText = [];
+      textNodes.forEach(node => {
+        if (!node.children || node.children.length === 0) {
+          const txt = (node.innerText || node.textContent || '').trim();
+          if (txt === 'B' || txt === '庄') validText.push('B');
+          else if (txt === 'P' || txt === '闲') validText.push('P');
+          else if (txt === 'T' || txt === '和') validText.push('T');
+        }
+      });
+      if (validText.length > 0) return validText.slice(-24);
+    } catch (e) {}
+
+    return [];
+  }
+
+  function getTables(messageId) {
+    try {
+      const doc = getTargetDoc();
+      const titleRegex = /(?:\([^)]+\))?\s*Bac\s*\d+/i;
+      const allNodes = doc.querySelectorAll('*');
+
+      for (const el of allNodes) {
+        if (el.children.length <= 2) {
+          const txt = (el.innerText || el.textContent || '').trim();
+          if (txt && titleRegex.test(txt) && txt.length <= 25) {
+            let card = el;
+            let foundCard = null;
+
+            for (let step = 0; step < 8; step++) {
+              if (!card || card === doc.body) break;
+              card = card.parentElement;
+              if (!card) break;
+
+              const cardText = card.innerText || card.textContent || '';
+              if (/Player/i.test(cardText) && /Banker/i.test(cardText)) {
+                const matchTitles = cardText.match(/(?:\([^)]+\))?\s*Bac\s*\d+/gi) || [];
+                if (matchTitles.length === 1) {
+                  foundCard = card;
+                } else if (matchTitles.length > 1) {
+                  break;
+                }
+              }
+            }
+
+            if (foundCard) {
+              const cleanId = txt.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+              const history = extractRoadHistory(foundCard);
+
+              cachedTablesMap.set(cleanId, {
+                id: cleanId,
+                name: txt,
+                betTime: 0,
+                history: history
+              });
+            }
+          }
+        }
+      }
+
+      // Fallback cho PC (#pc_multi_bet_tablebox)
+      const pcBoxes = doc.querySelectorAll('#pc_multi_bet_tablebox .gameroom-box.multiSelectContentItem, [class*="gameroom-box"]');
+      pcBoxes.forEach(box => {
+        const id = box.id;
+        if (!id) return;
+        let betTime = Number(box.getAttribute('data-bettime')) || 0;
+        if (!betTime) {
+          try {
+            const timeEl = box.querySelector('.time, .bet-time, .count-down, [class*="time"], [class*="countdown"]');
+            if (timeEl) {
+              const m = (timeEl.innerText || timeEl.textContent || '').match(/(\d{1,2})\s*s?/i);
+              if (m) betTime = parseInt(m[1]);
+            }
+          } catch (e) {}
+        }
+        if (!betTime) {
+          const m = (box.innerText || '').match(/\b(\d{1,2})\s*s\b/i);
+          if (m) betTime = parseInt(m[1]);
+        }
+
+        const friendlyName = extractTableName(box, id);
+        const history = extractRoadHistory(box);
+
+        cachedTablesMap.set(id, {
+          id: id,
+          name: friendlyName,
+          betTime: betTime,
+          history: history
+        });
+      });
+
+      const tables = Array.from(cachedTablesMap.values());
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        tables: tables,
+        totalDetected: tables.length
+      }, '*');
+
+    } catch (err) {
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        tables: Array.from(cachedTablesMap.values()),
+        error: err.message
+      }, '*');
+    }
+  }
+
+  function clickBetZone(tableId, bet, messageId) {
+    try {
+      const doc = getTargetDoc();
+      const betAreaId = bet === 'B' ? tableId + '_betAreaBanker' : tableId + '_betAreaPlayer';
+      let betArea = doc.getElementById(betAreaId);
+
+      if (!betArea) {
+        // Tìm theo text trên H5
+        const targetText = bet === 'B' ? /Banker/i : /Player/i;
+        const allNodes = doc.querySelectorAll('*');
+        for (const el of allNodes) {
+          if (el.children.length === 0 && targetText.test(el.innerText || '')) {
+            betArea = el.closest('button, div[class*="bet"]') || el;
+            break;
+          }
+        }
+      }
+
+      if (betArea) {
+        betArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        betArea.click();
+        window.parent.postMessage({
+          type: 'WM_IFRAME_RESPONSE',
+          messageId: messageId,
+          success: true,
+          tableId: tableId,
+          bet: bet
+        }, '*');
+      } else {
+        window.parent.postMessage({
+          type: 'WM_IFRAME_RESPONSE',
+          messageId: messageId,
+          success: false,
+          error: 'Bet area not found'
+        }, '*');
+      }
+    } catch (err) {
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        success: false,
+        error: err.message
+      }, '*');
+    }
+  }
+
+  function clickConfirm(tableId, messageId) {
+    try {
+      const doc = getTargetDoc();
+      const confirmBtnId = tableId + '_confirm';
+      let confirmBtn = doc.getElementById(confirmBtnId);
+
+      if (!confirmBtn) {
+        confirmBtn = doc.querySelector('[id*="confirm"], .confirm, .btn-confirm, [class*="confirm"], [class*="ok"]');
+      }
+
+      if (confirmBtn) {
+        confirmBtn.click();
+        window.parent.postMessage({
+          type: 'WM_IFRAME_RESPONSE',
+          messageId: messageId,
+          success: true,
+          tableId: tableId
+        }, '*');
+      } else {
+        window.parent.postMessage({
+          type: 'WM_IFRAME_RESPONSE',
+          messageId: messageId,
+          success: true,
+          tableId: tableId
+        }, '*');
+      }
+    } catch (err) {
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        success: false,
+        error: err.message
+      }, '*');
+    }
+  }
+
+  // ==========================================================================
+  // TỰ ĐỘNG CHỌN CHIP THEO XPATH / SELECTOR DO USER CẤP
+  // XPath: (//div[@name='10'])[1], (//div[@name='20'])[1], (//div[@name='50'])[1]
+  // ==========================================================================
+  function selectChip(chipValue, messageId) {
+    try {
+      const chipStr = String(chipValue);
+      const doc = getTargetDoc();
+      let chipEl = findChipNodeInDoc(doc, chipStr);
+
+      if (!chipEl && doc !== document) {
+        chipEl = findChipNodeInDoc(document, chipStr);
+      }
+
+      if (chipEl) {
+        simulateRealClick(chipEl);
+
+        window.parent.postMessage({
+          type: 'WM_IFRAME_RESPONSE',
+          messageId: messageId,
+          action: 'SELECT_CHIP',
+          success: true,
+          chip: chipStr
+        }, '*');
+      } else {
+        window.parent.postMessage({
+          type: 'WM_IFRAME_RESPONSE',
+          messageId: messageId,
+          action: 'SELECT_CHIP',
+          success: false,
+          chip: chipStr,
+          error: 'Chip element not found'
+        }, '*');
+      }
+    } catch (err) {
+      window.parent.postMessage({
+        type: 'WM_IFRAME_RESPONSE',
+        messageId: messageId,
+        action: 'SELECT_CHIP',
+        success: false,
+        chip: chipValue,
+        error: err.message
+      }, '*');
+    }
+  }
+
+  function simulateRealClick(el) {
+    if (!el) return;
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    } catch (e) {}
+
+    try {
+      el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    } catch (e) {}
+    try {
+      el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    } catch (e) {}
+    try {
+      el.click();
+    } catch (err) {}
+  }
+
+  function findChipNodeInDoc(doc, chipStr) {
+    if (!doc) return null;
+    const variants = [chipStr];
+    if (chipStr === '1000') variants.push('1k', '1K');
+    if (chipStr === '5000') variants.push('5k', '5K');
+
+    for (const val of variants) {
+      // 1. ƯU TIÊN SỐ 1: XPath do user cung cấp: (//div[@name='...'])[1]
+      try {
+        const xpath = `(//div[@name='${val}'])[1]`;
+        const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        if (res && res.singleNodeValue) return res.singleNodeValue;
+      } catch (e) {}
+
+      // 2. XPath tổng quát
+      try {
+        const xpath = `(//*[@name='${val}'])[1]`;
+        const res = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        if (res && res.singleNodeValue) return res.singleNodeValue;
+      } catch (e) {}
+
+      // 3. CSS querySelector
+      try {
+        const el = doc.querySelector(`div[name="${val}"], [name="${val}"]`);
+        if (el) return el;
+      } catch (e) {}
+
+      // 4. Data attributes
+      try {
+        const el = doc.querySelector(`[data-value="${val}"], [data-chip="${val}"]`);
+        if (el) return el;
+      } catch (e) {}
+    }
+
+    // Quét các iframe lồng nhau nếu có
+    try {
+      const iframes = doc.querySelectorAll('iframe');
+      for (const ifr of iframes) {
+        try {
+          const subDoc = ifr.contentDocument || ifr.contentWindow?.document;
+          const found = findChipNodeInDoc(subDoc, chipStr);
+          if (found) return found;
+        } catch (e) {}
+      }
+    } catch (e) {}
+
+    return null;
+  }
+
+  window.parent.postMessage({
+    type: 'WM_IFRAME_READY',
+    url: window.location.href
+  }, '*');
+
+})();
