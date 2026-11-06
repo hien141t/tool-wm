@@ -1,0 +1,144 @@
+--- a/cloud-ai-client.js
++++ b/cloud-ai-client.js
+@@ -434,6 +434,8 @@
+       };
+ 
+       this.cachedPredictions = new Map();
++      // A forecast must be joined to the *same future round* when its outcome arrives.
++      this._forecastIdentityByTable = new Map();
+       this.observedRoundsCache = new Map();
+       this.lastEvaluationTime = 0;
+ 
+@@ -672,7 +674,8 @@
+       }
+ 
+       const now = Date.now();
+-      const currentSignature = tablesList.map(t => `${t.id}:${(t.history || []).join('')}`).sort().join('|');
++      // History alone does not change during some WM table transitions.
++      const currentSignature = tablesList.map(t => `${t.id}:${t.shoe || ''}:${t.round || ''}:${(t.history || []).join('')}`).sort().join('|');
+ 
+       // Khóa chống bắn đè dồn ứ request khi cuộc gọi trước đang xử lý (In-flight concurrency guard)
+       if (this._isEvaluatingBatch) {
+@@ -698,20 +701,36 @@
+ 
+       this._isEvaluatingBatch = true;
+ 
++      const outboundForecasts = new Map();
+       const payload = {
+         mode: this.currentFilterMode,
+         tradingMode: 'REAL',
+         tables: tablesList.map((t) => {
+           const canonicalId = WMBaccaratAIEngine.canonicalizeTableId(t.id, t.name);
+           const histArr = Array.isArray(t.history) ? t.history : [];
+-          const identity = WMBaccaratAIEngine.buildRoundIdentity(t.id, t.name, histArr, '', t.shoe || '0');
++          const rawShoe = String(t.shoe || '0');
++          const n = Number(t.round || 0);
++          const sourceMeta = {
++            authoritativeShoeId: rawShoe !== '0' ? rawShoe : undefined,
++            roundIndex: Number.isInteger(n) && n > 0 ? n : undefined,
++          };
++          const identity = WMBaccaratAIEngine.buildRoundIdentity(t.id, t.name, histArr, '', rawShoe, sourceMeta);
++          const roundId = String(identity.roundIndex);
++          outboundForecasts.set(canonicalId, {
++            tableId: canonicalId, shoeId: identity.shoeId, roundId,
++            historyTail: histArr.slice(-12).join(''),
++            createdAt: Date.now()
++          });
+           return {
+-            id: t.id,
++            // IMPORTANT: observeRound also sends canonical table id, not raw DOM id.
++            id: canonicalId,
+             canonicalTableId: canonicalId,
+             name: t.name || t.id,
+             history: histArr,
+-            shoe: identity.shoeId,
+-            rawShoe: String(t.shoe || '0')
++            shoeId: identity.shoeId,
++            roundId,
++            nextRoundId: roundId,
++            rawShoe
+           };
+         })
+       };
+@@ -807,6 +826,9 @@
+ 
+             activeTableIds.add(t.id);
+             activeTableIds.add(canonicalId);
++            // Save the same (table, shoe, upcoming round) used in the server journal.
++            const sentIdentity = outboundForecasts.get(canonicalId);
++            if (sentIdentity) this._forecastIdentityByTable.set(canonicalId, sentIdentity);
+ 
+             const histArr = Array.isArray(t.history) ? t.history : [];
+             const shoeId = String(t.shoe || '0');
+@@ -984,7 +1006,21 @@
+ 
+       const histArr = Array.isArray(previousHistory) ? previousHistory : [];
+       const identity = WMBaccaratAIEngine.buildRoundIdentity(tableId, tableName, histArr, newOutcome, shoeId, meta);
+-      const dedupKeys = [identity.roundUid, identity.windowKey];
++      // A sliding 24-result window can obscure the ordinal; reuse the pre-outcome
++      // forecast identity, never make a new, differently keyed prediction ID.
++      const forecast = this._forecastIdentityByTable.get(identity.canonicalTableId);
++      const samePriorHistory = forecast && forecast.historyTail === histArr.slice(-12).join('');
++      const sourceShoe = meta && meta.authoritativeShoeId ? String(meta.authoritativeShoeId) : String(shoeId || '0');
++      const sameShoe = !forecast || sourceShoe === '0' || sourceShoe === forecast.shoeId;
++      if (forecast && samePriorHistory && sameShoe) {
++        identity.shoeId = forecast.shoeId;
++        identity.roundIndex = Number(forecast.roundId);
++      }
++      const dedupKeys = [
++        `${identity.canonicalTableId}|${identity.shoeId}|R${identity.roundIndex}|OUT_${newOutcome}`,
++        identity.roundUid,
++        identity.windowKey
++      ];
+ 
+       if (this._isRoundAlreadyObserved(dedupKeys)) {
+         return Promise.resolve({
+@@ -1057,6 +1093,10 @@
+             if (isConfirmedAck) {
+               // Chỉ đánh dấu ván bài là đã quan sát thành công KHI VPS Cloud đã xác nhận ACK!
+               this._markRoundObserved(dedupKeys);
++              // An in-flight forecast for the *next* round must not be deleted.
++              if (this._forecastIdentityByTable.get(identity.canonicalTableId) === forecast) {
++                this._forecastIdentityByTable.delete(identity.canonicalTableId);
++              }
+             }
+ 
+             if (res.data.status === 'CONFLICT' || res.data.conflict) {
+--- a/content.js
++++ b/content.js
+@@ -2150,7 +2150,10 @@
+               const prev = newHist.slice(0, i);
+               const outcome = newHist[i];
+               if (this.aiEngine) {
+-                this.aiEngine.onRoundCompleted(canonicalId, t.name || existing.name || canonicalId, prev, outcome);
++                this.aiEngine.onRoundCompleted(canonicalId, t.name || existing.name || canonicalId, prev, outcome, existing.shoe || t.shoe || '0', {
++                  authoritativeShoeId: (existing.shoe && existing.shoe !== '0') ? existing.shoe : ((t.shoe && t.shoe !== '0') ? t.shoe : undefined),
++                  roundIndex: Number(existing.round) > 0 ? Number(existing.round) : undefined
++                });
+               }
+             }
+             const recentLog = this.recentPredictionsLog.find(p => (p.tableId === canonicalId || p.tableId === t.id) && p.status === 'PENDING');
+@@ -5130,7 +5133,10 @@
+                 const prev = newHist.slice(0, i);
+                 const outcome = newHist[i];
+                 if (this.aiEngine) {
+-                  this.aiEngine.onRoundCompleted(canonicalId, t.name || existing.name || canonicalId, prev, outcome);
++                  this.aiEngine.onRoundCompleted(canonicalId, t.name || existing.name || canonicalId, prev, outcome, existing.shoe || t.shoe || '0', {
++                  authoritativeShoeId: (existing.shoe && existing.shoe !== '0') ? existing.shoe : ((t.shoe && t.shoe !== '0') ? t.shoe : undefined),
++                  roundIndex: Number(existing.round) > 0 ? Number(existing.round) : undefined
++                });
+                 }
+               }
+               const recentLog = this.recentPredictionsLog.find(p => (p.tableId === canonicalId || p.tableId === t.id) && p.status === 'PENDING');
+@@ -5680,7 +5686,10 @@
+             if (convertedHistory.length > oldLen && this.aiEngine) {
+               const newOutcome = convertedHistory[convertedHistory.length - 1];
+               const prevHist = convertedHistory.slice(0, -1);
+-              this.aiEngine.onRoundCompleted(matchedKey, matchedTable.name || matchedKey, prevHist, newOutcome);
++              this.aiEngine.onRoundCompleted(matchedKey, matchedTable.name || matchedKey, prevHist, newOutcome, matchedTable.shoe || shoeNo || '0', {
++                authoritativeShoeId: (matchedTable.shoe && matchedTable.shoe !== '0') ? matchedTable.shoe : ((shoeNo && shoeNo !== '0') ? shoeNo : undefined),
++                roundIndex: Number(matchedTable.round) > 0 ? Number(matchedTable.round) : undefined
++              });
+             }
+           } else {
+             const canonicalId = (window.WMBaccaratAIEngine && typeof window.WMBaccaratAIEngine.canonicalizeTableId === 'function')
