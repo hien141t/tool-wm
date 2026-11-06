@@ -31,7 +31,10 @@ def sha256(data: bytes) -> str:
 
 
 def command(argv: list[str], cwd: Path) -> None:
-    subprocess.run(argv, cwd=str(cwd), check=True, capture_output=True, text=True)
+    result = subprocess.run(argv, cwd=str(cwd), capture_output=True, text=True)
+    if result.returncode:
+        details = (result.stderr or result.stdout or '').strip()
+        raise RuntimeError(f"{argv[0]} failed (exit {result.returncode}): {details[:2500]}")
 
 
 def main() -> int:
@@ -74,8 +77,12 @@ def main() -> int:
         for name in FILES:
             (stage / name).write_bytes(sources[name].replace(b"\r\n", b"\n"))
         shutil.copy2(test, stage / test.name)
-        command(["git", "apply", "--check", str(patch)], stage)
-        command(["git", "apply", str(patch)], stage)
+        # Git for Windows core.autocrlf can turn .patch into CRLF; git apply
+        # would then fail against JS files normalized to LF in this staging dir.
+        normalized_patch = stage / "adaptive-v22.normalized.patch"
+        normalized_patch.write_bytes(patch.read_bytes().replace(b"\r\n", b"\n"))
+        command(["git", "apply", "--check", str(normalized_patch)], stage)
+        command(["git", "apply", str(normalized_patch)], stage)
         for name in FILES:
             if sha256((stage / name).read_bytes()) != PATCHED[name]:
                 raise RuntimeError(f"Unexpected patched checksum for {name}; aborted")
