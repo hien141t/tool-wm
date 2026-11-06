@@ -36,3 +36,24 @@ Patch verified by `git apply --check` and byte-for-byte comparison against user-
 On the demo admin's authenticated `/api/admin/data`, check only `predictionJournalDiagnostics`. With valid upcoming round IDs, `journal_attempts` and `journal_inserted` should increase; later verified outcomes should increment `prediction_journal.scored`; then `adaptive_weights` should acquire contexts after sufficient samples. If `missing_round_identity` keeps increasing, client metadata still mismatches.
 
 A successful simulation does **not** prove a profitable wagering model. Review `CONFLICT` outcomes and evaluate out of sample before considering any live mode.
+
+
+## Apply from this repository (not automatic Chrome update)
+
+The matching Cloud Client source is **not** the old wmautofull directory in this repository.
+After cloning/pulling this repo, on Windows use a *test copy* of your CLOUD extension:
+
+\`\`\`powershell
+py -3 .\patches\adaptive-20261106\apply_adaptive_client.py --check-only "D:\path\to\cloud-extension-test"
+py -3 .\patches\adaptive-20261106\apply_adaptive_client.py "D:\path\to\cloud-extension-test"
+\`\`\`
+
+The updater refuses unknown versions, checks the active extension manifest and original SHA-256,
+stages both changed scripts, verifies patched SHA-256, runs Node.js syntax and round-ID smoke tests,
+backs up both originals inside the extension folder, and then copies the patched scripts.
+Requires Git, Node.js and Python 3 on the machine running the updater.
+
+**GitHub merging does not update files on Windows.** After a successful patch,
+reload the correct unpacked Chrome extension in \`chrome://extensions\`.
+Continue only paper/simulation validation until \`journal_inserted\` and later
+\`scored\` are nonzero. Keep AUTO CƯỢC disabled independently.
